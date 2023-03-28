@@ -1,0 +1,199 @@
+/*
+ * CLA_GEN.c
+ *
+ *  Created on: 6 февр. 2023 г.
+ *      Author: AS
+ */
+#include "CLA_GEN.h"
+#include "DSP28x_Project.h"
+#include "DSP2803x_Device.h"
+#include "DSP2803x_Cla.h"
+#include "main.h"
+#include "stdint.h"
+
+extern float fCoeffs[FILTER_LEN];
+extern float fCoeffs_VDC[FILTER_LEN];
+extern float fDelayLine[FILTER_LEN];
+extern float fDelayLine_VDC[FILTER_LEN];
+//extern float fDelayLine_IHB_LS[FILTER_LEN];
+
+extern Uint16  VoltFilt;
+//extern float32  X[FILTER_LEN];
+//extern float32 A[FILTER_LEN];
+extern Uint16 isr_counter;
+extern Uint16 cla_step;
+//extern Uint16 VoltRaw[PERIOD_DIVIDER];
+//extern float32 sensors[16];
+extern float32 volts[16];
+extern float i_filt;
+extern Uint16 i_filt_counter;
+extern Uint16 seq_counter;
+extern Uint16 vhb[16];
+
+extern float i_in_filt;
+extern Uint16 i_in_filt_counter;
+extern int16 sns[16];
+
+__interrupt void Cla1Task1();
+__interrupt void Cla1Task2();
+__interrupt void Cla1Task3();
+__interrupt void Cla1Task4();
+__interrupt void Cla1Task5();
+__interrupt void Cla1Task6();
+__interrupt void Cla1Task7();
+__interrupt void Cla1Task8();
+
+//#pragma DATA_SECTION (Cla1Task7,"Cla1Prog");
+//#pragma DATA_SECTION (Cla1Task8,"Cla1Prog");
+__interrupt void Cla1Task1 ( void )
+{
+
+}
+__interrupt void Cla1Task2 ( void )
+{
+
+}
+__interrupt void Cla1Task3 ( void )
+{
+
+}
+__interrupt void Cla1Task4 ( void )
+{
+
+}
+__interrupt void Cla1Task5 ( void )
+{
+
+}
+__interrupt void Cla1Task6 ( void )
+{
+
+}
+interrupt void Cla1Task7(void )//Uint32 Cla1Task8 (void)
+{
+    Uint16 max = 0;
+    Uint16 i = 0;
+    float32 fTemp = 0;
+        //
+        // Shift the delay line to the right by 1
+        //
+    switch(isr_counter)
+    {
+        case 1:
+        {
+            sns[0] = AdcResult.ADCRESULT0; // CPU TEMP _SENSOR
+       //     sns[1] = AdcResult.ADCRESULT1; //ADC_Ihb_Is
+            sns[2] = AdcResult.ADCRESULT2;
+            sns[3] = AdcResult.ADCRESULT3;
+            sns[4] = AdcResult.ADCRESULT4;
+            sns[5] = AdcResult.ADCRESULT5;
+            //sns[6] = AdcResult.ADCRESULT6;
+            sns[7] = AdcResult.ADCRESULT7;
+           // sns[8] = AdcResult.ADCRESULT8;
+           // sns[9] = AdcResult.ADCRESULT9;
+            sns[10] = AdcResult.ADCRESULT10;
+            sns[11] = AdcResult.ADCRESULT11;
+            sns[12] = AdcResult.ADCRESULT12;
+            sns[13] = AdcResult.ADCRESULT13;
+            sns[14] = AdcResult.ADCRESULT14;
+            sns[15] = AdcResult.ADCRESULT15;
+
+            volts[ADC_IHB_LS] = (((0.00083)*(AdcResult.ADCRESULT1)) - 1.7)*16.0;
+            volts[ADC_TINT] = (sns[ADC_TINT]*0.00083)*(-47.017) + 176.88;
+            volts[ADC_VDC] = (((AdcResult.ADCRESULT8)*0.00083) - 0.01)*(200.0);
+            volts[ADC_IDC] = (((0.00083)*(AdcResult.ADCRESULT9)) - 1.7)*16.0;
+            volts[ADC_VRES] = 200.0*((((float)(AdcResult.ADCRESULT6))*0.00083) - 1.70);
+
+#pragma UNROLL(5)
+           for(i=FILTER_LEN-1;i>0;i--)
+           {
+               fDelayLine_VDC[i] = fDelayLine_VDC[i-1];
+
+               fTemp += fCoeffs[i]*fDelayLine_VDC[i];
+           }
+           fDelayLine_VDC[0] = volts[ADC_VDC]; //convert to single precision float
+           fTemp += fCoeffs[0]*fDelayLine_VDC[0];
+           volts[ADC_VDC] = fTemp*10.0;
+        i = 0;
+        fTemp = 0;
+#pragma UNROLL(5)
+           for(i=FILTER_LEN-1;i>0;i--)
+           {
+               fDelayLine[i] = fDelayLine[i-1];
+
+               fTemp += fCoeffs[i]*fDelayLine[i];
+           }
+           fDelayLine[0] = volts[ADC_VRES]; //convert to single precision float
+           fTemp += fCoeffs[0]*fDelayLine[0];
+           volts[ADC_VRES] = fTemp*10.0;
+        }
+        break;
+
+        case 0:
+        {
+            vhb[0] = AdcResult.ADCRESULT0;
+            vhb[1] = AdcResult.ADCRESULT1;
+            vhb[2] = AdcResult.ADCRESULT2;
+            vhb[3] = AdcResult.ADCRESULT3;
+            vhb[4] = AdcResult.ADCRESULT4;
+            vhb[5] = AdcResult.ADCRESULT5;
+            vhb[6] = AdcResult.ADCRESULT6;
+            vhb[7] = AdcResult.ADCRESULT7;
+            vhb[8] = AdcResult.ADCRESULT8;
+            vhb[9] = AdcResult.ADCRESULT9;
+            vhb[10] = AdcResult.ADCRESULT10;
+            vhb[11] = AdcResult.ADCRESULT11;
+            vhb[12] = AdcResult.ADCRESULT12;
+            vhb[13] = AdcResult.ADCRESULT13;
+            vhb[14] = AdcResult.ADCRESULT14;
+            vhb[15] = AdcResult.ADCRESULT15;
+
+            /*
+            i = 0;
+            max = vhb[0];
+                for(i = 1; i < 16; i++)
+                {
+                    if(max < vhb[i])
+                    {
+                        max = vhb[i];
+                    }
+                }
+           volts[ADC_VRES] = 2.0*((((float)(vhb[0]))*0.00083) - 1.70);
+           */
+        }
+        break;
+        default: break;
+    }
+    if(isr_counter < 1)
+    {
+        ++isr_counter;
+    }
+    else
+    {
+        isr_counter = 1;
+    }
+}
+interrupt void Cla1Task8 (void)
+{
+   //memset((uint16_t*)VoltRaw, 0, PERIOD_DIVIDER);
+   // memset((uint16_t*)X, 0, 8);
+   // memset((uint16_t*)A, 0, 8);
+    memset((uint16_t*)volts, 0, 16);
+   // memset((uint16_t*)sensors, 0, 16);
+    memset((uint16_t*)sns, 0, 16);
+    memset((uint16_t*)vhb, 0, 16);
+    fCoeffs[0] = 0.0214;
+    fCoeffs[1] = 0.0212;
+    fCoeffs[2] = 0.0213;
+    fCoeffs[3] = 0.0212;
+    fCoeffs[4] = 0.0214;
+
+    fCoeffs_VDC[0] = 0.00625; //{0.0625, 0.25, 0.375, 0.25, 0.0625};
+    fCoeffs_VDC[1] = 0.025;
+    fCoeffs_VDC[2] = 0.0375;
+    fCoeffs_VDC[3] = 0.025;
+    fCoeffs_VDC[4] = 0.00625;
+
+    isr_counter = 0;
+
+}
