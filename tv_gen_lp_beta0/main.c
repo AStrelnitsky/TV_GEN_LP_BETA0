@@ -1432,7 +1432,7 @@ void reprom_processing(void)
                                  }
                                  else if(reprom.id[i] >= 127)
                                  {
-                                     reprom.id[i] = reprom.id[i]/2;
+                                     reprom.id[i] = (reprom.id[i]/2) - 1;
                                      //reprom.id[i] = (reprom.id[i] - 127);
                                  }
                                  crc -= reprom.id[i];
