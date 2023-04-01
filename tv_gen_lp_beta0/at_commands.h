@@ -33,7 +33,7 @@
 #define AT_CIPMUX_MULT(x)                                           (x == 0 ? 12 : ((x) == 1 ? "AT+CIPMUX=1\r\n" : 13))
 #define AT_CIPSERVER_AP(x)                                          (x == 0 ? 13 : ((x) == 1 ? "AT+CIPSERVER=1,7\r\n" : 18))
 //#define AT_CWSAP_CUR(x)                                           (x == 0 ? 14 : ((x) == 1 ? "AT+CWSAP=\"ReasonanceUpdateFirmware_11.1\",\"100@101@\",5,3\r\n" : 57 ))//(x == 0 ? 14 : ((x) == 1 ? "AT+CWSAP=\"REASONANCE_GEN_3000.0_4.0_000TV\",\"3000zvxw\",5,3\r\n" : 59 ))
-#define AT_CWSAP_CUR(x)                                             (x == 0 ? 14 : ((x) == 1 ? "AT+CWSAP=\"REASONANCE_GEN_3000.0_4.0_000TV\",\"3000zvxw\",5,3\r\n" : 59 ))// (x == 0 ? 14 : ((x) == 1 ? "AT+CWSAP=\"REASONANCE_GEN_3000.0_4.0_000TV\",\"3000zvxw\",5,3\r\n" : 59 ))
+#define AT_CWSAP_CUR(x)                                             (x == 0 ? 14 : ((x) == 1 ? "AT+CWSAP=\"REASONANCE_GEN_3000.0_4.0_000TV\",\"00000000\",5,3\r\n" : 59 ))////#define AT_CWSAP_CUR(x)                                             (x == 0 ? 14 : ((x) == 1 ? "AT+CWSAP=\"REASONANCE_GEN_3000.0_4.0_000TV\",\"3000zvxw\",5,3\r\n" : 59 ))// (x == 0 ? 14 : ((x) == 1 ? "AT+CWSAP=\"REASONANCE_GEN_3000.0_4.0_000TV\",\"3000zvxw\",5,3\r\n" : 59 ))
 //#define AT_CWSAP_CUR(x)                                           (x == 0 ? 14 : ((x) == 1 ? "AT+CWSAP=\"ReasonanceUpdateFirmware_10.0\",\"100@101@\",5,3\r\n" : 57 ))//test
 #define AT_CIPSTATUS(x)                                             (x == 0 ? 15 : ((x) == 1 ? "AT+CIPSTATUS\r\n" : 14 ))
 //#define AT_CWSTATE(x)                                             (x == 0 ? 16 : ((x) == 1 ? "AT+CWSTATE?\r\n" : 13 ))
