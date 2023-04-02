@@ -8,10 +8,12 @@
 #ifndef GEN_H_
 #define GEN_H_
 
+#include "DSP28x_Project.h"
 #include <math.h>
 #include <stdint.h>
 #include <stddef.h>
 #include "main.h"
+#include "IQmathLib.h"
 //#include <xdc/std.h>
 
 #define SCI_RX_SIZE 128
@@ -71,12 +73,27 @@ typedef struct
 }MQTT_VAR;
 typedef struct
 {
-    uint16_t Counter, seq_length, s_p, b_p, m_p;
-    uint32_t  timeout;
-    uint16_t start_seq_finish;//bool start_seq_finish;
-    char seq[64];
-    float Uh, Ul, out, manch_bit[2];
-}POWER_ENCODER;
+    _iq limit_hi, limit_low, in_old, in_new, accum, out, T;
+}INTEGRATOR_Q;
+typedef struct
+{
+    _iq ki,kp,kd;
+    _iq T;
+    _iq accum;
+    _iq in, out;
+    INTEGRATOR_Q integrator;
+
+}PI_REG;
+typedef enum
+{
+    LOOP_DISABLE = 0,
+    LOOP_ENABLE
+}LOOPS_ENABLE;
+typedef struct
+{
+    _iq in, out, err, fbk, k_err;
+    //STRUCT_SOFT_START ss;
+}LOOP;
 typedef enum
 {
     CHARGE_IDLE = 0,
@@ -190,32 +207,11 @@ typedef struct
 
 typedef struct
 {
-    float ki,kp,kd;
-    float T;
-    float accum;
-    float in, out;
-    INTEGRATOR integrator;
-
-}PI_REG;
-
-typedef struct
-{
     INTEGRATOR integrator, integrator_loop;
     float kp,T;
     float in,out_s,out;
     float err,err_fb;
 }APERIODIC;
-typedef enum
-{
-    LOOP_DISABLE = 0,
-    LOOP_ENABLE
-}LOOPS_ENABLE;
-
-typedef struct
-{
-    float in, out, err, fbk, k_err;
-
-}LOOP;
 
 typedef struct
 {
@@ -255,19 +251,6 @@ typedef struct
     uint16_t Log_OC_Ihb;
     uint16_t Log_OV_Vhb;
 }LOGS_STRUCT;
-typedef struct
-{
-    float in;
-    float out;
-    float sin_gen[16];
-    int32_t sin_gen_int[16];
-    float phase, accum;
-    int16_t  err;
-    int16_t err_arr[32];
-    PI_REG pi;
-    uint16_t discrete_phase_counter;
-    float Kph;
-} PLL_STRUCT;
 /* Parameters (default storage) */
 typedef struct
 {
@@ -294,7 +277,7 @@ typedef struct
   float AMP,F,F_old;
   float k1,k2;
   uint16_t sm_status;
-  POWER_ENCODER encoder;
+  //POWER_ENCODER encoder;
   float u_obs;
   float v_fbk;
   float v_int;
@@ -306,6 +289,9 @@ typedef struct
   LOGS_R_STRUCT logs_r;
   LOGS_STRUCT logs;
   uint16_t detector;
+  PI_REG pi_u;
+  LOOPS_ENABLE u_out_loop_en;
+  LOOP u_out_loop;
 } GEN_STRUCT ;
 /* Block parameters (default storage) */
 extern GEN_STRUCT gen;

@@ -22,6 +22,8 @@
 #define ADC_PFC_TEMP    10
 #define ADC_PFC_VIN     11
 #define ADC_PFC_IIN     12
+#define V_NOM _IQ(300.0)
+#define AMP_LIMIT _IQ(1.0)
 
 void  reprom_ID_read(void);
 typedef struct
