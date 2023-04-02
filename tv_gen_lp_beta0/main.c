@@ -106,7 +106,7 @@ uint16_t vres_detector = 0;
 #define USER_DEBUG 1
 #define WIFI_TIMER_OVERFLOW 10//0x200//0x1FF//0x1FF
 #define WIFI_INIT_TIMER_OVERFLOW 0x250//0x1FF
-#define STATUS_Q_MQTT 300//10//20//10//100
+#define STATUS_Q_MQTT 600//10//20//10//100
 
 //__interrupt void cpu_timer0_isr(void);
 __interrupt void cpu_timer1_isr(void);
@@ -355,7 +355,7 @@ int main(void)
         initWiFi_station();
 
         wifi_init_flag = 1;
-        CpuTimer1.RegsAddr->PRD.all = 59999;//CpuTimer1.RegsAddr->PRD.all = 599999;
+        CpuTimer1.RegsAddr->PRD.all = 29999;//CpuTimer1.RegsAddr->PRD.all = 599999;
         while(1)
         {
             GpioDataRegs.GPATOGGLE.bit.GPIO4 |= 1;
@@ -768,7 +768,7 @@ void gen_initial_conditions(void)
     memset((uint16_t *)(&reprom),0, sizeof(DS2502R));
 
     gen.AMP = 0.0;//46;//0.65;
-    gen.F = 147000.0;//208000.0;
+    gen.F = 143600.0;//208000.0;
     gen.leds_duty[0] = 0.2;
     gen.leds_duty[1] = 0.2;
     gen.leds_duty[2] = 0.2;
@@ -3154,17 +3154,17 @@ void resetLoops(GEN_STRUCT * d)
       d->pi_u.accum = _IQ(0.0);
       d->pi_u.in = _IQ(0.0);
 
-      d->pi_u.integrator.T = _IQ(10.0);//d->pi_u.integrator.T = _IQ(0.1);
+      d->pi_u.integrator.T = _IQ(0.6);//d->pi_u.integrator.T = _IQ(0.1);
       d->pi_u.integrator.accum = _IQ(0.0);
       d->pi_u.integrator.in_new = _IQ(0.0);
       d->pi_u.integrator.in_old = _IQ(0.0);
-      d->pi_u.integrator.limit_hi = _IQ(2000.0);
+      d->pi_u.integrator.limit_hi = _IQ(4000.0);
       d->pi_u.integrator.limit_low = _IQ(-60.0);
       d->pi_u.integrator.out = _IQ(0.0);
 
 
       d->pi_u.kd = _IQ(0.0);
-      d->pi_u.ki = _IQ(1.0);//d->pi_u.ki = _IQ(0.3);
+      d->pi_u.ki = _IQ(0.2);//d->pi_u.ki = _IQ(0.3);
       d->pi_u.kp = _IQ(0.95);
       d->pi_u.out = _IQ(0.0);
 
