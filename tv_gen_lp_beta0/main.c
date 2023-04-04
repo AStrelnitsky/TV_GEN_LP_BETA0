@@ -106,7 +106,7 @@ uint16_t vres_detector = 0;
 #define USER_DEBUG 1
 #define WIFI_TIMER_OVERFLOW 10//0x200//0x1FF//0x1FF
 #define WIFI_INIT_TIMER_OVERFLOW 0x250//0x1FF
-#define STATUS_Q_MQTT 600//10//20//10//100
+#define STATUS_Q_MQTT 200//10//20//10//100
 
 //__interrupt void cpu_timer0_isr(void);
 __interrupt void cpu_timer1_isr(void);
@@ -499,7 +499,7 @@ __interrupt void cpu_timer1_isr(void)
         if(esp8266.station[1].status == TCP_CLIENT_IS_NOT_CONNECTED)
         {
             gen.leds_duty[0] = 0.2;
-            burst_duty = 0.1;
+            burst_duty = 0.05;
         }
         else if(esp8266.station[1].status == TCP_CLIENT_IS_CONNECTED)
         {
@@ -768,7 +768,7 @@ void gen_initial_conditions(void)
     memset((uint16_t *)(&reprom),0, sizeof(DS2502R));
 
     gen.AMP = 0.0;//46;//0.65;
-    gen.F = 143600.0;//208000.0;
+    gen.F = 144000.0;//208000.0;
     gen.leds_duty[0] = 0.2;
     gen.leds_duty[1] = 0.2;
     gen.leds_duty[2] = 0.2;
@@ -1864,16 +1864,13 @@ uint16_t stringSeeker(const char * str_src, const char * str_tg, uint16_t len_1,
 __interrupt void sci_isr(void)
 {
     uint16_t n, at_status;
-    uint16_t ipd_status = 0;
     const char *s1;
     const char *s2 = "AT+";
     const char *s_0 = "D,0";
     const char *s_1 = "D,1";
     const char *s_2 = "D,2";
     const char *s_3 = "D,3";
-    const char *s_udp = "STA";
     const char *s_dis = "US:";
-    //const char *s_3 = "+IPD,4";
     const char *s_send_ok = "ND OK";
     sciReadBuff();
     EALLOW;
@@ -2157,9 +2154,9 @@ uint16_t connection_manager(void)
                     */
 
                     remote_data[0] = (uint16_t)(burst_duty*100.0);//(uint16_t)(volts[ADC_IDC]*100.0);//(sns[ADC_IHB_LS)/10);//(int)(volts[ADC_TINT]);//bridge_temp;//(uint16_t)sensors[9];//tv_voltage;
-                    remote_data[1] = cpu_temp;//(uint16_t)(gen.AMP*100.0); //out_gen_current
-                    remote_data[2] = (uint16_t)(volts[ADC_VDC]);//(sns[ADC_IDC] - 2000);//(uint16_t)(volts[ADC_VDC] / 10.0); //t_tv_board
-                    remote_data[3] = (uint16_t)(volts[ADC_TINT]);//(uint16_t)(volts[ADC_IHB_LS]*10.0);
+                    remote_data[1] = 0;//cpu_temp;//(uint16_t)(gen.AMP*100.0); //out_gen_current
+                    remote_data[2] = 0;//(uint16_t)(volts[ADC_VDC]);//(sns[ADC_IDC] - 2000);//(uint16_t)(volts[ADC_VDC] / 10.0); //t_tv_board
+                    remote_data[3] = 0;//(uint16_t)(volts[ADC_TINT]);//(uint16_t)(volts[ADC_IHB_LS]*10.0);
                     remote_data[4] = vres_detector;//(uint16_t)(volts[ADC_VRES]);
                     remote_data[5]  = 0;
 
@@ -2197,7 +2194,7 @@ uint16_t connection_manager(void)
                                      default: break;
                             }
                             //mqtt_message_constructor(&message.publish.content.data[0], &remote_data[5*var_counter], 5, &mqtt_var[0]);
-                            mqtt_message_constructor(&message.publish.content.data[0], &remote_data[9*var_counter], 9, &mqtt_var[0]);
+                            mqtt_message_constructor(&message.publish.content.data[0], &remote_data[5*var_counter], 5, &mqtt_var[0]);
                             mqtt.p_len  = mqtt_serialiser_size(&serialiser, &message);
                             memset(mqtt_publish_common, 0, sizeof(mqtt_publish_common));
                             mqtt_serialiser_write(&serialiser,&message,&mqtt_publish_common[0], mqtt.p_len); //-2??
@@ -2597,12 +2594,12 @@ void mqtt_manager(void)
                     init = waitATReceive_nonbloking_service(s,1, WIFI_TIMER_OVERFLOW);
                     if(init == 2)
                     {
-                       // data_rx_service[1] = 0;
+                        data_rx_service[1] = 0;
                         mqtt.state_machine = MMQT_DATA_SEND_OK;
                     }
                     else if(init == 3)
                     {
-                      // data_rx_service[1] = 0;
+                       data_rx_service[1] = 0;
                         mqtt.state_machine = MMQT_DATA_SEND_OK;
                     }
                 }
@@ -2676,13 +2673,13 @@ void mqtt_parser(char * data)
     const char *str_off = "s_off";
    // const char *str_h_on = "tv_museum_ch_on";
   //  const char *str_h_off = "tv_museum_ch_off";
-    const char *str_rst = "rst=";
-    const char *str_f = "{f=:";
+   // const char *str_rst = "rst=";
+   // const char *str_f = "{f=:";
     const char *str_d = "{d=:0.";
 
    // const char *str_eeprom = "eeprom";
-    const char *str_k1 = "k1:=";
-    const char *str_k2 = "k2:=";
+   // const char *str_k1 = "k1:=";
+   // const char *str_k2 = "k2:=";
    // const char *str_ki = "ki:=";
   //  const char *str_kp = "kp:=";
     const char *str_uh = "uh:=";
@@ -2882,6 +2879,7 @@ uint16_t IPD_parser(const char * str)
     const char *s1 = (char*) esp8266.AT_rx_buff;
         if(stringSeeker(s1,s_head, 100,2, &n))
         {
+            esp8266.station[1].status = TCP_CLIENT_IS_CONNECTED;
             esp8266.station[1].lost_connection = 0;
             memcpy(&data_rx[0], &esp8266.AT_rx_buff[n + 2], 32);
         }
@@ -3164,7 +3162,7 @@ void resetLoops(GEN_STRUCT * d)
 
 
       d->pi_u.kd = _IQ(0.0);
-      d->pi_u.ki = _IQ(0.2);//d->pi_u.ki = _IQ(0.3);
+      d->pi_u.ki = _IQ(0.1);//d->pi_u.ki = _IQ(0.3);
       d->pi_u.kp = _IQ(0.95);
       d->pi_u.out = _IQ(0.0);
 
