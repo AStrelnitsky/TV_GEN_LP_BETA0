@@ -21,6 +21,7 @@
 #include "serialiser.h"
 #include "DSP2803x_GlobalPrototypes.h"
 #include "IQmathLib.h"
+#include "SFO_V6.h"
 //#include "F2803x_Cla_defines.h"
 //
 //#pragma DATA_SECTION(X,             "Cla1ToCpuMsgRAM");
@@ -263,10 +264,19 @@ uint32_t read_id_wait = 0;
 uint16_t wifi_init_flag = 0;
 float32 apm = 0.0;
 float32 burst_duty = 0.0;
+uint16_t duty_fine = 0;
+uint16_t prd_fine = 0;
 uint16_t id_state = 0;
 uint16_t e_detector = 0;
 uint16_t uh = 18;
 uint16_t ul = 24;
+int MEP_ScaleFactor;
+//
+// Array of pointers to EPwm register structures:
+// *ePWM[0] is defined as dummy value not used in the example
+//
+volatile struct EPWM_REGS *ePWM[PWM_CH] =
+             {  &EPwm1Regs, &EPwm1Regs, &EPwm2Regs, &EPwm3Regs, &EPwm4Regs};
 //char recbuff[SCI_RX_SIZE];
 int main(void)
 {
@@ -356,6 +366,7 @@ int main(void)
 
         wifi_init_flag = 1;
         CpuTimer1.RegsAddr->PRD.all = 29999;//CpuTimer1.RegsAddr->PRD.all = 599999;
+        gen.F = 71600.0;
         while(1)
         {
             GpioDataRegs.GPATOGGLE.bit.GPIO4 |= 1;
@@ -368,7 +379,7 @@ int main(void)
             {
                burst_duty = 0.0;
             }
-
+            SFO();
 
         }
 }
@@ -523,7 +534,7 @@ __interrupt void cpu_timer1_isr(void)
     if(CpuTimer1.InterruptCount >= BURST_FREQ)
     {
         CpuTimer1.InterruptCount = 0;
-        gen.AMP = 0.5;//0.48;
+        gen.AMP = 0.7;//0.48;
     }
     if(CpuTimer1.InterruptCount < BURST_FREQ)
     {
@@ -546,7 +557,11 @@ __interrupt void cpu_timer1_isr(void)
 
    EALLOW;
    EPwm1Regs.TBPRD = (uint16_t)(base);
+
+   EPwm1Regs.TBPRDHR = prd_fine;
+
    EPwm1Regs.CMPA.half.CMPA = SINBOT1[0];
+  // EPwm1Regs.CMPA.all = SINBOT1[0] + (duty_fine << 8);
    EPwm1Regs.CMPB = SINTOP1[1];
 
    EPwm2Regs.TBPRD = base_led;
@@ -596,6 +611,9 @@ void InitEPwmTimer1(void)
 
     EPwm1Regs.TBPRD = (uint16_t)(base);
     EPwm1Regs.TBCTL.bit.CTRMODE = TB_COUNT_UPDOWN;   // Count up mode
+
+    EPwm1Regs.TBCTL.bit.HSPCLKDIV = TB_DIV1;
+
     EPwm1Regs.ETSEL.bit.INTSEL = ET_CTRU_CMPA;//ET_CTR_ZERO;    // Select INT on Zero event
     EPwm1Regs.ETSEL.bit.INTEN = PWM1_INT_ENABLE; // Enable INT
     EPwm1Regs.ETPS.bit.INTPRD = ET_1ST;          // Generate INT on 1st event
@@ -603,6 +621,8 @@ void InitEPwmTimer1(void)
 
     //EPwm1Regs.CMPA.half.CMPA = 0;//PWM1_TIMER_TBPRD / 2;//;
     //EPwm1Regs.CMPB = 0;
+   // EPwm1Regs.CMPA.half.CMPAHR = (1 << 8);
+
     EPwm1Regs.CMPA.half.CMPA = SINBOT1[0];
     EPwm1Regs.CMPB = SINTOP1[1];
 
@@ -614,6 +634,23 @@ void InitEPwmTimer1(void)
 
     EPwm1Regs.AQCTLA.all = 0x0090;
     EPwm1Regs.AQCTLB.all = 0x0600;
+
+    EALLOW;
+    EPwm1Regs.HRCNFG.all = 0x0;
+    EPwm1Regs.HRCNFG.bit.EDGMODE = HR_REP;      //MEP control on Rising edge
+    EPwm1Regs.HRCNFG.bit.CTLMODE = HR_CMP;
+    EPwm1Regs.HRCNFG.bit.HRLOAD  = HR_CTR_ZERO;
+    EPwm1Regs.HRPCTL.bit.HRPE = 0x1;
+    EPwm1Regs.HRCNFG.bit.AUTOCONV = 1;
+        //
+        // Enable TBPHSHR sync (required for updwn count HR control)
+        //
+    EPwm1Regs.HRPCTL.bit.TBPHSHRLOADE = 1;
+        //
+        // Turn on high-resolution period control
+        //
+    EPwm1Regs.HRPCTL.bit.HRPE = 1;
+    EDIS;
 
     EALLOW;
     SysCtrlRegs.PCLKCR0.bit.TBCLKSYNC = 1;   // Start all the timers synced
