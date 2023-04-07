@@ -107,7 +107,7 @@ uint16_t vres_detector = 0;
 #define USER_DEBUG 1
 #define WIFI_TIMER_OVERFLOW 10//0x200//0x1FF//0x1FF
 #define WIFI_INIT_TIMER_OVERFLOW 0x250//0x1FF
-#define STATUS_Q_MQTT 200//10//20//10//100
+#define STATUS_Q_MQTT 100//200//10//20//10//100
 
 //__interrupt void cpu_timer0_isr(void);
 __interrupt void cpu_timer1_isr(void);
@@ -271,6 +271,7 @@ uint16_t e_detector = 0;
 uint16_t uh = 18;
 uint16_t ul = 24;
 int MEP_ScaleFactor;
+uint16_t publish_counter = 0;
 //
 // Array of pointers to EPwm register structures:
 // *ePWM[0] is defined as dummy value not used in the example
@@ -510,16 +511,30 @@ __interrupt void cpu_timer1_isr(void)
         if(esp8266.station[1].status == TCP_CLIENT_IS_NOT_CONNECTED)
         {
             gen.leds_duty[0] = 0.2;
+          //  gen.leds_duty[2] = 0.0;
             burst_duty = 0.05;
         }
         else if(esp8266.station[1].status == TCP_CLIENT_IS_CONNECTED)
         {
-            gen.leds_duty[0] = 0.0;
-            gen.u_out_loop.in = V_NOM;
-            gen.u_out_loop.fbk = _IQ(vres_detector);
-            gen.u_out_loop_en = LOOP_ENABLE;
-            d_b = loopProcessing(&(gen.u_out_loop), &(gen.pi_u), gen.u_out_loop_en, V_NOM);
-            burst_duty = _IQtoF(d_b);
+            if(!(cnt % 10))
+            {
+                if(esp8266.station[1].lost_connection < 10)
+                {
+                    gen.leds_duty[0] = 0.0;
+                    gen.leds_duty[2] = 0.2;
+                    gen.u_out_loop.in = V_NOM;
+                    gen.u_out_loop.fbk = _IQ(vres_detector);
+                    gen.u_out_loop_en = LOOP_ENABLE;
+                    d_b = loopProcessing(&(gen.u_out_loop), &(gen.pi_u), gen.u_out_loop_en, V_NOM);
+                    burst_duty = _IQtoF(d_b);
+                }
+                else
+                {
+                    gen.leds_duty[0] = 0.2;
+                    gen.leds_duty[2] = 0.0;
+                }
+                ++(esp8266.station[1].lost_connection);
+            }
         }
 
     }
@@ -534,7 +549,7 @@ __interrupt void cpu_timer1_isr(void)
     if(CpuTimer1.InterruptCount >= BURST_FREQ)
     {
         CpuTimer1.InterruptCount = 0;
-        gen.AMP = 0.7;//0.48;
+        gen.AMP = 0.9;//0.48;
     }
     if(CpuTimer1.InterruptCount < BURST_FREQ)
     {
@@ -2052,12 +2067,12 @@ void atCommandManager(uint16_t command)
         {
                atCommand_tx.len = AT_CWSAP_CUR(LEN);
                memcpy(&(atCommand_tx.str[0]), AT_CWSAP_CUR(STR), atCommand_tx.len);
-               atCommand_tx.str[34] = reprom.id[0];
-               atCommand_tx.str[35] = reprom.id[1];
-               atCommand_tx.str[36] = reprom.id[2];
-               atCommand_tx.str[37] = reprom.id[3];
-               atCommand_tx.str[38] = reprom.id[4];
-               atCommand_tx.str[39] = reprom.id[5];
+               atCommand_tx.str[34] = '~';//reprom.id[0];
+               atCommand_tx.str[35] = '>';//reprom.id[1];
+               atCommand_tx.str[36] = '0';//reprom.id[2];
+               atCommand_tx.str[37] = '0';//reprom.id[3];
+               atCommand_tx.str[38] = '0';//reprom.id[4];
+               atCommand_tx.str[39] = '0';//reprom.id[5];
         }
         break;
         case ((int) AT_CIPSTATUS(NUM)):
@@ -2191,11 +2206,14 @@ uint16_t connection_manager(void)
                     */
 
                     remote_data[0] = (uint16_t)(burst_duty*100.0);//(uint16_t)(volts[ADC_IDC]*100.0);//(sns[ADC_IHB_LS)/10);//(int)(volts[ADC_TINT]);//bridge_temp;//(uint16_t)sensors[9];//tv_voltage;
-                    remote_data[1] = 0;//cpu_temp;//(uint16_t)(gen.AMP*100.0); //out_gen_current
-                    remote_data[2] = 0;//(uint16_t)(volts[ADC_VDC]);//(sns[ADC_IDC] - 2000);//(uint16_t)(volts[ADC_VDC] / 10.0); //t_tv_board
-                    remote_data[3] = 0;//(uint16_t)(volts[ADC_TINT]);//(uint16_t)(volts[ADC_IHB_LS]*10.0);
+                    remote_data[1] = cpu_temp;//(uint16_t)(gen.AMP*100.0); //out_gen_current
+                    remote_data[2] = (uint16_t)(volts[ADC_VDC]);//(sns[ADC_IDC] - 2000);//(uint16_t)(volts[ADC_VDC] / 10.0); //t_tv_board
+                    remote_data[3] = (uint16_t)(volts[ADC_TINT]);//(uint16_t)(volts[ADC_IHB_LS]*10.0);
                     remote_data[4] = vres_detector;//(uint16_t)(volts[ADC_VRES]);
                     remote_data[5]  = 0;
+                    remote_data[6]  = 0;
+                    remote_data[7]  = 0;
+                    remote_data[8]  = 0;
 
                     if(esp8266.c_status == ESP8266_CWJAP_TERMINAL_OK)
                     {   if(MMQT_SUBSCRIBE_OK == (mqtt.state_machine))
@@ -2231,7 +2249,7 @@ uint16_t connection_manager(void)
                                      default: break;
                             }
                             //mqtt_message_constructor(&message.publish.content.data[0], &remote_data[5*var_counter], 5, &mqtt_var[0]);
-                            mqtt_message_constructor(&message.publish.content.data[0], &remote_data[5*var_counter], 5, &mqtt_var[0]);
+                            mqtt_message_constructor(&message.publish.content.data[0], &remote_data[9*var_counter], 9, &mqtt_var[0]);
                             mqtt.p_len  = mqtt_serialiser_size(&serialiser, &message);
                             memset(mqtt_publish_common, 0, sizeof(mqtt_publish_common));
                             mqtt_serialiser_write(&serialiser,&message,&mqtt_publish_common[0], mqtt.p_len); //-2??
@@ -2457,10 +2475,12 @@ void mqtt_manager(void)
                                //gen.leds_duty[0] = 0.0;
                                s = "0,CONNECT";
                                s1 = "ALREADY";
-                               init = waitATReceive_nonbloking(s, 9, 2*WIFI_TIMER_OVERFLOW);
-                               init1 = waitATReceive_nonbloking(s1, 7, 2*WIFI_TIMER_OVERFLOW);
-                               if((init == 2) || (init1 == 2))
+                               init = waitATReceive_nonbloking_service(s, 9, 2*WIFI_TIMER_OVERFLOW);
+                              // init1 = waitATReceive_nonbloking_service(s1, 7, 2*WIFI_TIMER_OVERFLOW);
+                               //if((init == 2) || (init1 == 2))
+                               if((init == 2) || (data_rx_service[0] == 'A'))
                                {
+                                   data_rx_service[0] = 0;
                                    mqtt.state_machine = MQTT_CONNECT_TO_SERVER_OK;
                                }
                                else if(init == 3)
@@ -2486,7 +2506,7 @@ void mqtt_manager(void)
                                 s = ">";
                                 data_rx_service[1] = 1;
                                 init = waitATReceive_nonbloking(s,1, 5*WIFI_TIMER_OVERFLOW);
-                                if(init == 2)
+                                if((init == 2) || (data_rx_service[0] == '>'))
                                 {
                                     data_rx_service[0] = 0;
                                     mqtt.state_machine = MMQT_SEND_OK;
@@ -2580,18 +2600,20 @@ void mqtt_manager(void)
                 case MMQT_SUBSCRIBE_OK:
                 {
                     //gen.leds_duty[0] = 0.2;
-                    s = ">";
-                    init = waitATReceive_nonbloking_service(s,1, WIFI_TIMER_OVERFLOW);
-                    if(init == 2)
-                    {
-                         data_rx_service[0] = 0;
-                         mqtt.state_machine = MMQT_PREPARE_DATA_SEND_OK;
-                    }
-                    else if(init == 3)
-                    {
-                         atCommand_tx.tx_flag = 1;
-                         atCommandManager((int)AT_CIPSEND_STA_ID0_MQTT_DATA(NUM));
-                    }
+
+                        s = ">";
+                        init = waitATReceive_nonbloking_service(s,1, WIFI_TIMER_OVERFLOW);
+                        if(init == 2)
+                        {
+                             data_rx_service[0] = 0;
+                             mqtt.state_machine = MMQT_PREPARE_DATA_SEND_OK;
+                        }
+                        else if(init == 3)
+                        {
+                                publish_counter = 0;
+                                atCommand_tx.tx_flag = 1;
+                                atCommandManager((int)AT_CIPSEND_STA_ID0_MQTT_DATA(NUM));
+                        }
 
                   //  atCommand_tx.tx_flag = 1;
                    // atCommandManager((int)AT_CIPSEND_STA_ID0_MQTT_DATA(NUM));
@@ -2933,7 +2955,7 @@ uint16_t AT_parser(const char * str)
     uint16_t n = 0;
     const char *s_status = "+CIPSTATUS:";
     const char *s_serv = ">";
-
+    const char *s_alr = "ALR";
     if (stringSeeker(str, s_status, 128 ,11, &n))
     {
         n =  atStatusParser(str);
@@ -2941,6 +2963,10 @@ uint16_t AT_parser(const char * str)
     else if (stringSeeker(str, s_serv, 64, 1, &n))
     {
         //memcpy(&data_rx_service[0], &esp8266.AT_rx_buff[n], 64);
+        data_rx_service[0] = esp8266.AT_rx_buff[n];
+    }
+    else if (stringSeeker(str, s_alr, 64, 3, &n))
+    {
         data_rx_service[0] = esp8266.AT_rx_buff[n];
     }
     return n;

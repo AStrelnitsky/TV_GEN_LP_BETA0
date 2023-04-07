@@ -27,7 +27,7 @@
 #define NOTEMPTY                       7                         /* waiting timeout*/
 #define RCVMAXRETRY                    10
 #define RCVMAXCNTS                     500
-#define RCVMAXCNTL                     3000//1500//15000
+#define RCVMAXCNTL                     10000//1500//15000
 #define SHORTLOOP                      0
 #define LONGLOOP                       1
 
