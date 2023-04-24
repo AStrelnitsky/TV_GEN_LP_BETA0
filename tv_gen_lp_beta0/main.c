@@ -47,7 +47,7 @@
 #define BURST_FREQ 100
 
 #pragma DATA_SECTION(fCoeffs,"Cla1ToCpuMsgRAM");
-float fCoeffs[FILTER_LEN] = {0.0212, 0.00212, 0.00213, 0.00212, 0.0212};// {0.0625, 0.25, 0.375, 0.25, 0.0625};//{0.0625, 0.25, 0.375, 0.25, 0.0625};
+float fCoeffs[FILTER_LEN] = {0.0625, 0.25, 0.375, 0.25, 0.0625};//{0.0212, 0.00212, 0.00213, 0.00212, 0.0212};// {0.0625, 0.25, 0.375, 0.25, 0.0625};//{0.0625, 0.25, 0.375, 0.25, 0.0625};
 #pragma DATA_SECTION(fDelayLine,"Cla1ToCpuMsgRAM");
 float fDelayLine[FILTER_LEN] = {0,0,0,0,0};
 #pragma DATA_SECTION(fDelayLine_VDC,"Cla1ToCpuMsgRAM");
@@ -76,6 +76,7 @@ uint16_t mqtt_shift[16];
 uint16_t mqtt_shift_counter = 0;
 int cpu_temp = 0;//_IQ(0.0);
 uint16_t vres_detector = 0;
+//uint16_t rect_temp = 0;
 //int bridge_temp = 0;
 //
 // The following will be placed in the CPU to CLA
@@ -380,6 +381,14 @@ int main(void)
             {
                burst_duty = 0.0;
             }
+            if(cpu_temp > 120)
+            {
+               burst_duty = 0.0;
+            }
+            if((data_rx[6] > 85) || (data_rx[7] > 85) || ((volts[ADC_TEXT]) > 85.0) )
+            {
+                burst_duty = 0.0;
+            }
             SFO();
 
         }
@@ -488,6 +497,7 @@ __interrupt void cpu_timer1_isr(void)
 {
     _iq d_b = _IQ(0.0);
     vres_detector = data_rx[4] + (((uint16_t)data_rx[5]) << 8);
+   // rect_temp = (uint16_t)data_rx[6];
     if(mqtt.swicth == 0)
     {
         /*
@@ -508,35 +518,58 @@ __interrupt void cpu_timer1_isr(void)
           burst_duty = 0.0;
         }
         */
-        if(esp8266.station[1].status == TCP_CLIENT_IS_NOT_CONNECTED)
+        if(remote_data[5] < 3)
         {
-            gen.leds_duty[0] = 0.2;
-          //  gen.leds_duty[2] = 0.0;
-            burst_duty = 0.05;
-        }
-        else if(esp8266.station[1].status == TCP_CLIENT_IS_CONNECTED)
-        {
-            if(!(cnt % 10))
+            if(esp8266.station[1].status == TCP_CLIENT_IS_NOT_CONNECTED)
             {
-                if(esp8266.station[1].lost_connection < 10)
+                gen.leds_duty[0] = 0.2;
+              //  gen.leds_duty[2] = 0.0;
+                burst_duty = 0.05;
+            }
+            else if(esp8266.station[1].status == TCP_CLIENT_IS_CONNECTED)
+            {
+                if(!(cnt % 10))
                 {
-                    gen.leds_duty[0] = 0.0;
-                    gen.leds_duty[2] = 0.2;
-                    gen.u_out_loop.in = V_NOM;
-                    gen.u_out_loop.fbk = _IQ(vres_detector);
-                    gen.u_out_loop_en = LOOP_ENABLE;
-                    d_b = loopProcessing(&(gen.u_out_loop), &(gen.pi_u), gen.u_out_loop_en, V_NOM);
-                    burst_duty = _IQtoF(d_b);
+                    if(esp8266.station[1].lost_connection < 10)
+                    {
+                        gen.leds_duty[0] = 0.0;
+                        gen.leds_duty[2] = 0.2;
+                        gen.u_out_loop.in = V_NOM;
+                        gen.u_out_loop.fbk = _IQ(vres_detector);
+                        gen.u_out_loop_en = LOOP_ENABLE;
+                        d_b = loopProcessing(&(gen.u_out_loop), &(gen.pi_u), gen.u_out_loop_en, V_NOM);
+                        burst_duty = _IQtoF(d_b);
+                    }
+                    else
+                    {
+                        gen.leds_duty[0] = 0.2;
+                        gen.leds_duty[2] = 0.0;
+                    }
+                    ++(esp8266.station[1].lost_connection);
                 }
-                else
-                {
-                    gen.leds_duty[0] = 0.2;
-                    gen.leds_duty[2] = 0.0;
-                }
-                ++(esp8266.station[1].lost_connection);
             }
         }
-
+        else
+        {
+            if(esp8266.station[1].status == TCP_CLIENT_IS_CONNECTED)
+            {
+              if(!(cnt % 10))
+              {
+                  if(esp8266.station[1].lost_connection < 10)
+                  {
+                     gen.leds_duty[0] = 0.0;
+                     gen.leds_duty[2] = 0.2;
+                  }
+                  else
+                  {
+                     gen.leds_duty[0] = 0.2;
+                     gen.leds_duty[2] = 0.0;
+                  }
+                     ++(esp8266.station[1].lost_connection);
+              }
+            }
+            burst_duty = 0.95;
+        }
     }
     else
     {
@@ -2183,7 +2216,6 @@ uint16_t connection_manager(void)
     const char *str_send = "AT+CIPSEND=0,";
     uint16_t len = 0;
     uint16_t num = 0;
-    uint16_t kptr = 0;
     if(atCommand_tx.console != 1 )
     {
                     /*
@@ -2210,10 +2242,10 @@ uint16_t connection_manager(void)
                     remote_data[2] = (uint16_t)(volts[ADC_VDC]);//(sns[ADC_IDC] - 2000);//(uint16_t)(volts[ADC_VDC] / 10.0); //t_tv_board
                     remote_data[3] = (uint16_t)(volts[ADC_TINT]);//(uint16_t)(volts[ADC_IHB_LS]*10.0);
                     remote_data[4] = vres_detector;//(uint16_t)(volts[ADC_VRES]);
-                    remote_data[5]  = 0;
-                    remote_data[6]  = 0;
-                    remote_data[7]  = 0;
-                    remote_data[8]  = 0;
+                    remote_data[5]  = (uint16_t)(volts[ADC_IDC]*10.0);
+                    remote_data[6]  = (uint16_t)data_rx[6];///(uint16_t)volts[ADC_IHB_LS];
+                    remote_data[7]  = (uint16_t)data_rx[7];
+                    remote_data[8]  = (uint16_t)(volts[ADC_TEXT]);
 
                     if(esp8266.c_status == ESP8266_CWJAP_TERMINAL_OK)
                     {   if(MMQT_SUBSCRIBE_OK == (mqtt.state_machine))

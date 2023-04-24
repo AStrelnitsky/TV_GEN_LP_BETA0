@@ -17,6 +17,7 @@
 #define ADC_TINT        3
 #define ADC_IHB         4
 #define ADC_VRES        6
+#define ADC_TEXT        7
 #define ADC_VDC         8
 #define ADC_IDC         9
 #define ADC_PFC_TEMP    10
