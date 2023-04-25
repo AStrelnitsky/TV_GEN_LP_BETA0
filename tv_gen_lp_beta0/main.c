@@ -385,7 +385,7 @@ int main(void)
             {
                burst_duty = 0.0;
             }
-            if((data_rx[6] > 85) || (data_rx[7] > 85) || ((volts[ADC_TEXT]) > 85.0) )
+            if((data_rx[6] > 85) || (data_rx[7] > 85) ) // if((data_rx[6] > 85) || (data_rx[7] > 85) || ((volts[ADC_TEXT]) > 85.0) )
             {
                 burst_duty = 0.0;
             }
@@ -518,19 +518,19 @@ __interrupt void cpu_timer1_isr(void)
           burst_duty = 0.0;
         }
         */
-        if(remote_data[5] < 3)
+        if(remote_data[5] < 12)
         {
             if(esp8266.station[1].status == TCP_CLIENT_IS_NOT_CONNECTED)
             {
                 gen.leds_duty[0] = 0.2;
               //  gen.leds_duty[2] = 0.0;
-                burst_duty = 0.05;
+                burst_duty = 0.03;
             }
             else if(esp8266.station[1].status == TCP_CLIENT_IS_CONNECTED)
             {
                 if(!(cnt % 10))
                 {
-                    if(esp8266.station[1].lost_connection < 10)
+                    if(esp8266.station[1].lost_connection < 20)
                     {
                         gen.leds_duty[0] = 0.0;
                         gen.leds_duty[2] = 0.2;
@@ -555,7 +555,7 @@ __interrupt void cpu_timer1_isr(void)
             {
               if(!(cnt % 10))
               {
-                  if(esp8266.station[1].lost_connection < 10)
+                  if(esp8266.station[1].lost_connection < 20)
                   {
                      gen.leds_duty[0] = 0.0;
                      gen.leds_duty[2] = 0.2;
@@ -568,7 +568,7 @@ __interrupt void cpu_timer1_isr(void)
                      ++(esp8266.station[1].lost_connection);
               }
             }
-            burst_duty = 0.95;
+            burst_duty = 0.97;
         }
     }
     else

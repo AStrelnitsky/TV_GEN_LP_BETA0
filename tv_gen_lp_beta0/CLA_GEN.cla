@@ -91,7 +91,7 @@ interrupt void Cla1Task7(void )//Uint32 Cla1Task8 (void)
            // sns[7] = AdcResult.ADCRESULT7;
            // sns[8] = AdcResult.ADCRESULT8;
            // sns[9] = AdcResult.ADCRESULT9;
-            sns[10] = AdcResult.ADCRESULT10;
+           // sns[10] = AdcResult.ADCRESULT10;
             sns[11] = AdcResult.ADCRESULT11;
             sns[12] = AdcResult.ADCRESULT12;
             sns[13] = AdcResult.ADCRESULT13;
@@ -100,7 +100,7 @@ interrupt void Cla1Task7(void )//Uint32 Cla1Task8 (void)
 
             volts[ADC_IHB_LS] = (((0.00083)*(AdcResult.ADCRESULT1)) - 1.7)*16.0;
             volts[ADC_TINT] = (sns[ADC_TINT]*0.00083)*(-47.017) + 176.88;
-            volts[ADC_TEXT] = (AdcResult.ADCRESULT7)*0.00083;
+            volts[ADC_TEXT] = (AdcResult.ADCRESULT6)*0.00083;
             if(volts[ADC_TEXT] >= 2.58)
             {
                 volts[ADC_TEXT] = (volts[ADC_TEXT])*(-39.313) + 152.39;
@@ -108,6 +108,17 @@ interrupt void Cla1Task7(void )//Uint32 Cla1Task8 (void)
             else
             {
                 volts[ADC_TEXT] = (volts[ADC_TEXT])*(-119.05) + 357.14;
+            }
+
+            volts[ADC_PFC_TEMP] = (AdcResult.ADCRESULT10)*0.00083;
+
+            if(volts[ADC_PFC_TEMP] >= 2.58)
+            {
+               volts[ADC_PFC_TEMP] = (volts[ADC_PFC_TEMP])*(-39.313) + 152.39;
+            }
+            else
+            {
+               volts[ADC_PFC_TEMP] = (volts[ADC_PFC_TEMP])*(-119.05) + 357.14;
             }
             volts[ADC_VDC] = (((AdcResult.ADCRESULT8)*0.00083) - 0.01)*(200.0);
             volts[ADC_IDC] = (((0.00083)*(AdcResult.ADCRESULT9)) - 1.7)*16.0;
