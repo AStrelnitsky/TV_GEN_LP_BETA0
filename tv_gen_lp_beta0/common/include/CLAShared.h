@@ -56,22 +56,15 @@ extern "C" {
     //
     // Defines
     //
-    #define FILTER_LEN          5
+    #define FILTER_LEN     7// 5
     #define PERIOD_DIVIDER 16
-    #define FILTER_LEN 5
+  //  #define FILTER_LEN 7//5
 
     extern float fCoeffs[FILTER_LEN];
     extern float fDelayLine[FILTER_LEN];
-    extern float fCoeffs_VDC[FILTER_LEN];
+    //extern float fCoeffs_VDC[FILTER_LEN];
     extern float fDelayLine_VDC[FILTER_LEN];
-    //extern float fDelayLine_VRES[FILTER_LEN];
-    extern Uint16  VoltFilt;
-  //  extern float32  X[FILTER_LEN];
-  //  extern float32 A[FILTER_LEN];
     extern Uint16 isr_counter;
-    extern Uint16 cla_step;
-    //extern Uint16 VoltRaw[PERIOD_DIVIDER];
-    extern float32 i_filt;
     extern Uint16 i_filt_counter;
     extern float i_in_filt;
     extern Uint16 i_in_filt_counter;

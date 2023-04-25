@@ -24,15 +24,10 @@
 #include "SFO_V6.h"
 //#include "F2803x_Cla_defines.h"
 //
-//#pragma DATA_SECTION(X,             "Cla1ToCpuMsgRAM");
-//#pragma DATA_SECTION(VoltRaw,      "Cla1ToCpuMsgRAM");
-#pragma DATA_SECTION(VoltFilt,      "Cla1ToCpuMsgRAM");
 #pragma DATA_SECTION(isr_counter,   "Cla1ToCpuMsgRAM");
-#pragma DATA_SECTION(cla_step,   "Cla1ToCpuMsgRAM");
 //#pragma DATA_SECTION(sensors,   "Cla1ToCpuMsgRAM");
 #pragma DATA_SECTION(volts,   "Cla1ToCpuMsgRAM");
 
-#pragma DATA_SECTION(i_filt,   "Cla1ToCpuMsgRAM");
 #pragma DATA_SECTION(i_filt_counter,   "Cla1ToCpuMsgRAM");
 
 #pragma DATA_SECTION(i_in_filt,   "Cla1ToCpuMsgRAM");
@@ -47,24 +42,22 @@
 #define BURST_FREQ 100
 
 #pragma DATA_SECTION(fCoeffs,"Cla1ToCpuMsgRAM");
-float fCoeffs[FILTER_LEN] = {0.0625, 0.25, 0.375, 0.25, 0.0625};//{0.0212, 0.00212, 0.00213, 0.00212, 0.0212};// {0.0625, 0.25, 0.375, 0.25, 0.0625};//{0.0625, 0.25, 0.375, 0.25, 0.0625};
+float fCoeffs[FILTER_LEN];//{0.0212, 0.00212, 0.00213, 0.00212, 0.0212};// {0.0625, 0.25, 0.375, 0.25, 0.0625};//{0.0625, 0.25, 0.375, 0.25, 0.0625};
 #pragma DATA_SECTION(fDelayLine,"Cla1ToCpuMsgRAM");
-float fDelayLine[FILTER_LEN] = {0,0,0,0,0};
+float fDelayLine[FILTER_LEN];
 #pragma DATA_SECTION(fDelayLine_VDC,"Cla1ToCpuMsgRAM");
 float fDelayLine_VDC[FILTER_LEN];
 //#pragma DATA_SECTION(fDelayLine_VRES,"Cla1ToCpuMsgRAM");
 //float fDelayLine_VRES[FILTER_LEN];
 
 #pragma DATA_SECTION(fDelayLine_VDC,"Cla1ToCpuMsgRAM");
-extern float fCoeffs_VDC[FILTER_LEN] = {0.0625, 0.25, 0.375, 0.25, 0.0625};
+//extern float fCoeffs_VDC[FILTER_LEN] = {0.0625, 0.25, 0.375, 0.25, 0.0625};
 float32 volts[16];
 //float32 sensors[16];
 //float32 X[FILTER_LEN];
 //Uint16 VoltRaw[PERIOD_DIVIDER];
-Uint16 VoltFilt;
 Uint16 isr_counter;
 Uint16 cla_step = 1;
-float32 i_filt;
 Uint16 i_filt_counter;
 float i_in_filt;
 Uint16 i_in_filt_counter;
@@ -271,6 +264,9 @@ uint16_t id_state = 0;
 uint16_t e_detector = 0;
 uint16_t uh = 18;
 uint16_t ul = 24;
+uint16_t idc = 0;
+uint32_t idc_acc = 0;
+uint16_t tim_counter = 0;
 int MEP_ScaleFactor;
 uint16_t publish_counter = 0;
 //
@@ -348,11 +344,18 @@ int main(void)
         PieCtrlRegs.PIEIER11.bit.INTx7 = 1;
         GpioCtrlRegs.GPAMUX1.bit.GPIO4 = 0;
        // while (read_id_wait < 210)
-        while (id_state < 7)
-        {
-            GpioDataRegs.GPATOGGLE.bit.GPIO4 |= 1;
-            ++read_id_wait;
-        }
+        reprom.id[0] = '~';//reprom.id[0];
+        reprom.id[1] = '>';//reprom.id[1];
+        reprom.id[2] = '0';//reprom.id[2];
+        reprom.id[3] = '0';//reprom.id[3];
+        reprom.id[4] = '0';//reprom.id[4];
+        reprom.id[5] = '0';//reprom.id[5];
+
+      //  while (id_state < 7)
+     //   {
+    //        GpioDataRegs.GPATOGGLE.bit.GPIO4 |= 1;
+    //        ++read_id_wait;
+    //    }
 
         //ConfigCpuTimer(&CpuTimer1, 60, 50000);
 
@@ -385,7 +388,7 @@ int main(void)
             {
                burst_duty = 0.0;
             }
-            if((data_rx[6] > 85) || (data_rx[7] > 85) ) // if((data_rx[6] > 85) || (data_rx[7] > 85) || ((volts[ADC_TEXT]) > 85.0) )
+            if((data_rx[6] > 85) || (data_rx[7] > 85) || ((volts[ADC_TEXT]) > 85.0) )
             {
                 burst_duty = 0.0;
             }
@@ -497,6 +500,20 @@ __interrupt void cpu_timer1_isr(void)
 {
     _iq d_b = _IQ(0.0);
     vres_detector = data_rx[4] + (((uint16_t)data_rx[5]) << 8);
+    if(tim_counter < 48)
+    {
+        if(volts[ADC_IDC] > 0.0)
+        {
+           idc_acc  += (uint16_t)(volts[ADC_IDC]*10.0);
+        }
+        ++tim_counter;
+    }
+    else
+    {
+        idc = idc_acc / tim_counter;
+        tim_counter = 0;
+        idc_acc = 0;
+    }
    // rect_temp = (uint16_t)data_rx[6];
     if(mqtt.swicth == 0)
     {
@@ -518,13 +535,19 @@ __interrupt void cpu_timer1_isr(void)
           burst_duty = 0.0;
         }
         */
-        if(remote_data[5] < 12)
+        if(idc <= 4)
         {
             if(esp8266.station[1].status == TCP_CLIENT_IS_NOT_CONNECTED)
             {
-                gen.leds_duty[0] = 0.2;
-              //  gen.leds_duty[2] = 0.0;
-                burst_duty = 0.03;
+              //  if(esp8266.station[1].lost_connection > 20)
+             //   {
+                    gen.leds_duty[0] = 0.2;
+                    burst_duty = 0.03;
+            //    }
+            //    else
+            //    {
+            //        ++(esp8266.station[1].lost_connection);
+            //    }
             }
             else if(esp8266.station[1].status == TCP_CLIENT_IS_CONNECTED)
             {
@@ -568,7 +591,7 @@ __interrupt void cpu_timer1_isr(void)
                      ++(esp8266.station[1].lost_connection);
               }
             }
-            burst_duty = 0.97;
+            burst_duty = 0.7;
         }
     }
     else
@@ -582,7 +605,7 @@ __interrupt void cpu_timer1_isr(void)
     if(CpuTimer1.InterruptCount >= BURST_FREQ)
     {
         CpuTimer1.InterruptCount = 0;
-        gen.AMP = 0.9;//0.48;
+        gen.AMP = 0.95;//0.48;
     }
     if(CpuTimer1.InterruptCount < BURST_FREQ)
     {
@@ -2242,7 +2265,7 @@ uint16_t connection_manager(void)
                     remote_data[2] = (uint16_t)(volts[ADC_VDC]);//(sns[ADC_IDC] - 2000);//(uint16_t)(volts[ADC_VDC] / 10.0); //t_tv_board
                     remote_data[3] = (uint16_t)(volts[ADC_TINT]);//(uint16_t)(volts[ADC_IHB_LS]*10.0);
                     remote_data[4] = vres_detector;//(uint16_t)(volts[ADC_VRES]);
-                    remote_data[5]  = (uint16_t)(volts[ADC_IDC]*10.0);
+                    remote_data[5] = idc;
                     remote_data[6]  = (uint16_t)data_rx[6];///(uint16_t)volts[ADC_IHB_LS];
                     remote_data[7]  = (uint16_t)data_rx[7];
                     remote_data[8]  = (uint16_t)(volts[ADC_TEXT]);
@@ -2566,7 +2589,7 @@ void mqtt_manager(void)
                 case MMQT_CONNECT_TX:
                 {
                                     s = "IPD";
-                                    init = waitATReceive_nonbloking(s,3, 2*WIFI_TIMER_OVERFLOW);
+                                    init = waitATReceive_nonbloking(s,3, 5*WIFI_TIMER_OVERFLOW);
                                     if(init == 2)
                                     {
                                        data_rx_service[1] = 0;
