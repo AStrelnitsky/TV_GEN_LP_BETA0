@@ -269,6 +269,7 @@ uint32_t idc_acc = 0;
 uint16_t tim_counter = 0;
 int MEP_ScaleFactor;
 uint16_t publish_counter = 0;
+uint16_t state_maschine_pointer = 0;
 //
 // Array of pointers to EPwm register structures:
 // *ePWM[0] is defined as dummy value not used in the example
@@ -500,7 +501,7 @@ __interrupt void cpu_timer1_isr(void)
 {
     _iq d_b = _IQ(0.0);
     vres_detector = data_rx[4] + (((uint16_t)data_rx[5]) << 8);
-    if(tim_counter < 48)
+    if(tim_counter < 128)
     {
         if(volts[ADC_IDC] > 0.0)
         {
@@ -535,19 +536,20 @@ __interrupt void cpu_timer1_isr(void)
           burst_duty = 0.0;
         }
         */
-        if(idc <= 4)
+        if((state_maschine_pointer == 0) && (idc > 7))
+        {
+            state_maschine_pointer = 1;
+        }
+        if((state_maschine_pointer == 1) && (idc <= 2))
+        {
+            state_maschine_pointer = 0;
+        }
+        if((state_maschine_pointer == 0) || (vres_detector >= 330) || (vres_detector < 250))
         {
             if(esp8266.station[1].status == TCP_CLIENT_IS_NOT_CONNECTED)
             {
-              //  if(esp8266.station[1].lost_connection > 20)
-             //   {
                     gen.leds_duty[0] = 0.2;
                     burst_duty = 0.03;
-            //    }
-            //    else
-            //    {
-            //        ++(esp8266.station[1].lost_connection);
-            //    }
             }
             else if(esp8266.station[1].status == TCP_CLIENT_IS_CONNECTED)
             {
@@ -582,6 +584,7 @@ __interrupt void cpu_timer1_isr(void)
                   {
                      gen.leds_duty[0] = 0.0;
                      gen.leds_duty[2] = 0.2;
+                    // loopProcessing(&(gen.u_out_loop), &(gen.pi_u), gen.u_out_loop_en, V_NOM);
                   }
                   else
                   {
@@ -591,7 +594,7 @@ __interrupt void cpu_timer1_isr(void)
                      ++(esp8266.station[1].lost_connection);
               }
             }
-            burst_duty = 0.7;
+            burst_duty = 0.65;
         }
     }
     else

@@ -79,7 +79,7 @@ interrupt void Cla1Task7(void )//Uint32 Cla1Task8 (void)
             sns[0] = AdcResult.ADCRESULT0; // CPU TEMP _SENSOR
        //     sns[1] = AdcResult.ADCRESULT1; //ADC_Ihb_Is
           //  sns[2] = AdcResult.ADCRESULT2;
-         //   sns[3] = AdcResult.ADCRESULT3;
+            sns[3] = AdcResult.ADCRESULT3;
          //   sns[4] = AdcResult.ADCRESULT4;
         //    sns[5] = AdcResult.ADCRESULT5;
             //sns[6] = AdcResult.ADCRESULT6;
