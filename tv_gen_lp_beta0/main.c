@@ -101,7 +101,7 @@ uint16_t vres_detector = 0;
 #define USER_DEBUG 1
 #define WIFI_TIMER_OVERFLOW 10//0x200//0x1FF//0x1FF
 #define WIFI_INIT_TIMER_OVERFLOW 0x250//0x1FF
-#define STATUS_Q_MQTT 100//200//10//20//10//100
+#define STATUS_Q_MQTT 200//200//10//20//10//100
 
 //__interrupt void cpu_timer0_isr(void);
 __interrupt void cpu_timer1_isr(void);
@@ -161,6 +161,7 @@ uint16_t d = 0;
 uint32_t acqps = 6;
 uint16_t ap = 1;
 uint16_t len;
+uint16_t global_fault = 0;
 const char *s1;
 const char *s_1310 = "\r\n";
 const char *s_13_10 = "\n";
@@ -372,7 +373,7 @@ int main(void)
 
         wifi_init_flag = 1;
         CpuTimer1.RegsAddr->PRD.all = 29999;//CpuTimer1.RegsAddr->PRD.all = 599999;
-        gen.F = 71600.0;
+        gen.F = 144200.0;//71600.0;
         while(1)
         {
             GpioDataRegs.GPATOGGLE.bit.GPIO4 |= 1;
@@ -383,18 +384,29 @@ int main(void)
 
             if(volts[ADC_TINT] > 90.0)
             {
-               burst_duty = 0.0;
+                global_fault = 1;
+            }
+            else if(volts[ADC_TINT] < 80.0)
+            {
+                global_fault = 0;
             }
             if(cpu_temp > 120)
             {
-               burst_duty = 0.0;
+                global_fault = 1;
             }
-            if((data_rx[6] > 85) || (data_rx[7] > 85) || ((volts[ADC_TEXT]) > 85.0) )
+            else if(cpu_temp < 90)
             {
-                burst_duty = 0.0;
+                 global_fault = 0;
+            }
+            if((data_rx[6] > 85) || (data_rx[7] > 85) || ((volts[ADC_TEXT]) > 85.0))
+            {
+                global_fault = 1;
+            }
+            else
+            {
+                global_fault = 0;
             }
             SFO();
-
         }
 }
 void init_GPIO(void)
@@ -501,7 +513,7 @@ __interrupt void cpu_timer1_isr(void)
 {
     _iq d_b = _IQ(0.0);
     vres_detector = data_rx[4] + (((uint16_t)data_rx[5]) << 8);
-    if(tim_counter < 128)
+    if(tim_counter < 256)
     {
         if(volts[ADC_IDC] > 0.0)
         {
@@ -516,147 +528,177 @@ __interrupt void cpu_timer1_isr(void)
         idc_acc = 0;
     }
    // rect_temp = (uint16_t)data_rx[6];
-    if(mqtt.swicth == 0)
+    if(mqtt.swicth == 1)
     {
-        /*
-        if(volts[ADC_VDC] >= 280.0)
+        if(mqtt.hand_control == 0)
         {
-            if(e_detector == 0)
+            /*
+            if(volts[ADC_VDC] >= 280.0)
             {
-               burst_duty = 0.35;
+                if(e_detector == 0)
+                {
+                   burst_duty = 0.35;
+                }
+                else
+                {
+                   burst_duty = 0.96;
+                }
+            }
+            else if(volts[ADC_VDC] < 200.0)
+            {
+              e_detector = 0;
+              burst_duty = 0.0;
+            }
+            */
+            if((state_maschine_pointer == 0) && (idc >= 4))
+            {
+                state_maschine_pointer = 1;
+            }
+            if((state_maschine_pointer == 1) && (idc <= 2))
+            {
+                state_maschine_pointer = 0;
+            }
+            if((state_maschine_pointer == 0) || (vres_detector >= 330) || (vres_detector < 220))
+            {
+                gen.F = 144200.0;
+                if(esp8266.station[1].status == TCP_CLIENT_IS_NOT_CONNECTED)
+                {
+                        gen.leds_duty[0] = 0.2;
+                        burst_duty = 0.06;
+                }
+                else if(esp8266.station[1].status == TCP_CLIENT_IS_CONNECTED)
+                {
+                    if(!(cnt % 10))
+                    {
+                        if(esp8266.station[1].lost_connection < 20)
+                        {
+                            gen.leds_duty[0] = 0.0;
+                            gen.leds_duty[2] = 0.2;
+                            gen.u_out_loop.in = V_NOM;
+                            gen.u_out_loop.fbk = _IQ(vres_detector);
+                            gen.u_out_loop_en = LOOP_ENABLE;
+                            d_b = loopProcessing(&(gen.u_out_loop), &(gen.pi_u), gen.u_out_loop_en, V_NOM);
+                            burst_duty = _IQtoF(d_b);
+                        }
+                        else
+                        {
+                            gen.leds_duty[0] = 0.2;
+                            gen.leds_duty[2] = 0.0;
+                        }
+                        ++(esp8266.station[1].lost_connection);
+                    }
+                }
             }
             else
             {
-               burst_duty = 0.96;
-            }
-        }
-        else if(volts[ADC_VDC] < 200.0)
-        {
-          e_detector = 0;
-          burst_duty = 0.0;
-        }
-        */
-        if((state_maschine_pointer == 0) && (idc > 7))
-        {
-            state_maschine_pointer = 1;
-        }
-        if((state_maschine_pointer == 1) && (idc <= 2))
-        {
-            state_maschine_pointer = 0;
-        }
-        if((state_maschine_pointer == 0) || (vres_detector >= 330) || (vres_detector < 250))
-        {
-            if(esp8266.station[1].status == TCP_CLIENT_IS_NOT_CONNECTED)
-            {
-                    gen.leds_duty[0] = 0.2;
-                    burst_duty = 0.03;
-            }
-            else if(esp8266.station[1].status == TCP_CLIENT_IS_CONNECTED)
-            {
-                if(!(cnt % 10))
+                if(esp8266.station[1].status == TCP_CLIENT_IS_CONNECTED)
                 {
-                    if(esp8266.station[1].lost_connection < 20)
-                    {
-                        gen.leds_duty[0] = 0.0;
-                        gen.leds_duty[2] = 0.2;
-                        gen.u_out_loop.in = V_NOM;
-                        gen.u_out_loop.fbk = _IQ(vres_detector);
-                        gen.u_out_loop_en = LOOP_ENABLE;
-                        d_b = loopProcessing(&(gen.u_out_loop), &(gen.pi_u), gen.u_out_loop_en, V_NOM);
-                        burst_duty = _IQtoF(d_b);
-                    }
-                    else
-                    {
-                        gen.leds_duty[0] = 0.2;
-                        gen.leds_duty[2] = 0.0;
-                    }
-                    ++(esp8266.station[1].lost_connection);
+                  if(!(cnt % 10))
+                  {
+                      if(esp8266.station[1].lost_connection < 20)
+                      {
+                         gen.leds_duty[0] = 0.0;
+                         gen.leds_duty[2] = 0.2;
+                        // loopProcessing(&(gen.u_out_loop), &(gen.pi_u), gen.u_out_loop_en, V_NOM);
+                         d_b = loopProcessing(&(gen.u_out_loop), &(gen.pi_u), gen.u_out_loop_en, V_NOM);
+                         gen.F = 144200.0 - ((_IQtoF(d_b))*1000.0);
+                      }
+                      else
+                      {
+                         gen.leds_duty[0] = 0.2;
+                         gen.leds_duty[2] = 0.0;
+                      }
+                         ++(esp8266.station[1].lost_connection);
+                  }
                 }
+                burst_duty = 1.0;
             }
         }
         else
         {
-            if(esp8266.station[1].status == TCP_CLIENT_IS_CONNECTED)
+            if(mqtt.duty <= 1)
             {
-              if(!(cnt % 10))
-              {
-                  if(esp8266.station[1].lost_connection < 20)
-                  {
-                     gen.leds_duty[0] = 0.0;
-                     gen.leds_duty[2] = 0.2;
-                    // loopProcessing(&(gen.u_out_loop), &(gen.pi_u), gen.u_out_loop_en, V_NOM);
-                  }
-                  else
-                  {
-                     gen.leds_duty[0] = 0.2;
-                     gen.leds_duty[2] = 0.0;
-                  }
-                     ++(esp8266.station[1].lost_connection);
-              }
+                mqtt.duty = 0;
             }
-            burst_duty = 0.65;
+            burst_duty = 0.01*(mqtt.duty);
+            gen.F = 1.0*(mqtt.freq) + 10000.0*mqtt.freq_h + 100000.0;
+            if(gen.F < 141000.0)
+            {
+                gen.F = 141000.0;
+            }
+            if(gen.F > 149999.0)
+            {
+                gen.F = 149999.0;
+            }
         }
-    }
-    else
-    {
-        if(mqtt.duty <= 1)
+        if(!global_fault)
         {
-            mqtt.duty = 0;
-        }
-        burst_duty = 0.01*(mqtt.duty);
-    }
-    if(CpuTimer1.InterruptCount >= BURST_FREQ)
-    {
-        CpuTimer1.InterruptCount = 0;
-        gen.AMP = 0.95;//0.48;
-    }
-    if(CpuTimer1.InterruptCount < BURST_FREQ)
-    {
-        if((CpuTimer1.InterruptCount) >= ((burst_duty)*(BURST_FREQ)))
-        {
-            gen.AMP = 0.0;//apm
+            if(CpuTimer1.InterruptCount >= BURST_FREQ)
+            {
+                CpuTimer1.InterruptCount = 0;
+                gen.AMP = 0.95;//0.48;
+            }
+            if(CpuTimer1.InterruptCount < BURST_FREQ)
+            {
+                if((CpuTimer1.InterruptCount) >= ((burst_duty)*(BURST_FREQ)))
+                {
+                    gen.AMP = 0.0;//apm
+                }
+                else
+                {
+                    //vres_detector = (uint16_t)(volts[ADC_VRES]);
+                }
+                CpuTimer1.InterruptCount++;
+            }
         }
         else
         {
-            //vres_detector = (uint16_t)(volts[ADC_VRES]);
+            gen.AMP = 0.0;
         }
-        CpuTimer1.InterruptCount++;
-    }
 
-   cpu_temp = GetTemperatureC(sns[0]);
+       cpu_temp = GetTemperatureC(sns[0]);
 
-   ++cnt;
-   base = timer_arrays_update(gen.AMP, (4*gen.F), SINTOP1, SINBOT1);
-   base_led =  0x48;//(uint16_t)(base);//(uint16_t)(base * PERIOD_DIVIDER);
+       ++cnt;
+      // base = timer_arrays_update(gen.AMP, (4*gen.F), SINTOP1, SINBOT1);
 
-   EALLOW;
-   EPwm1Regs.TBPRD = (uint16_t)(base);
+       base = timer_arrays_update(gen.AMP, (2*gen.F), SINTOP1, SINBOT1);
 
-   EPwm1Regs.TBPRDHR = prd_fine;
+       base_led =  0x48;//(uint16_t)(base);//(uint16_t)(base * PERIOD_DIVIDER);
 
-   EPwm1Regs.CMPA.half.CMPA = SINBOT1[0];
-  // EPwm1Regs.CMPA.all = SINBOT1[0] + (duty_fine << 8);
-   EPwm1Regs.CMPB = SINTOP1[1];
+       EALLOW;
+       EPwm1Regs.TBPRD = (uint16_t)(base);
 
-   EPwm2Regs.TBPRD = base_led;
-   EPwm2Regs.CMPA.half.CMPA = (gen.leds_duty[0])*(EPwm2Regs.TBPRD);
-   EPwm2Regs.CMPB = (gen.leds_duty[1])*(EPwm2Regs.TBPRD);
+       EPwm1Regs.TBPRDHR = prd_fine;
 
-   EPwm3Regs.TBPRD = base_led;
-   EPwm3Regs.CMPA.half.CMPA = (gen.leds_duty[2])*(EPwm3Regs.TBPRD);
+       EPwm1Regs.CMPA.half.CMPA = SINBOT1[0];
+      // EPwm1Regs.CMPA.all = SINBOT1[0] + (duty_fine << 8);
+       EPwm1Regs.CMPB = SINTOP1[1];
 
-   if(wifi_init_flag == 1)
-   {
-       EPwm4Regs.TBPRD = (base * PERIOD_MULTIPLIER_TIM);
+       EPwm2Regs.TBPRD = base_led;
+       EPwm2Regs.CMPA.half.CMPA = (gen.leds_duty[0])*(EPwm2Regs.TBPRD);
+       EPwm2Regs.CMPB = (gen.leds_duty[1])*(EPwm2Regs.TBPRD);
+
+       EPwm3Regs.TBPRD = base_led;
+       EPwm3Regs.CMPA.half.CMPA = (gen.leds_duty[2])*(EPwm3Regs.TBPRD);
+
+       if(wifi_init_flag == 1)
+       {
+           EPwm4Regs.TBPRD = (base * PERIOD_MULTIPLIER_TIM);
+       }
+       else
+       {
+           EPwm4Regs.TBPRD = (base / PERIOD_DIVIDER_TIM);
+       }
+       EPwm4Regs.CMPA.half.CMPA = (EPwm4Regs.TBPRD / 2);
+
+       EDIS;
    }
    else
    {
-       EPwm4Regs.TBPRD = (base / PERIOD_DIVIDER_TIM);
+        gen.AMP = 0.0;
+        burst_duty = 0.0;
+        resetLoops(&gen);
    }
-   EPwm4Regs.CMPA.half.CMPA = (EPwm4Regs.TBPRD / 2);
-
-   EDIS;
-
   // debug_console();
 }
 __interrupt void cpu_timer2_isr(void)
@@ -982,7 +1024,8 @@ void gen_initial_conditions(void)
     mqtt.state_machine = MQTT_CONNECT_TO_SERVER;
     mqtt.uh = 22.0;
     mqtt.ul = 23.0;
-    mqtt.swicth = 0;
+    mqtt.swicth = 1;
+    mqtt.hand_control = 0;
     mqtt.k1 = 24.0;
     mqtt.k2 = 22.0;
     mqtt_serialiser_write(&serialiser, &connect_message, &mqtt_connect[0], mqtt.connect_p_len); //-2??
@@ -2269,9 +2312,10 @@ uint16_t connection_manager(void)
                     remote_data[3] = (uint16_t)(volts[ADC_TINT]);//(uint16_t)(volts[ADC_IHB_LS]*10.0);
                     remote_data[4] = vres_detector;//(uint16_t)(volts[ADC_VRES]);
                     remote_data[5] = idc;
-                    remote_data[6]  = (uint16_t)data_rx[6];///(uint16_t)volts[ADC_IHB_LS];
+                    remote_data[6]  = (uint16_t)(data_rx[6] + 9);///(uint16_t)volts[ADC_IHB_LS];
                     remote_data[7]  = (uint16_t)data_rx[7];
                     remote_data[8]  = (uint16_t)(volts[ADC_TEXT]);
+                    remote_data[9]  = (uint16_t)((gen.F - 140000.0) / 10.0);
 
                     if(esp8266.c_status == ESP8266_CWJAP_TERMINAL_OK)
                     {   if(MMQT_SUBSCRIBE_OK == (mqtt.state_machine))
@@ -2307,7 +2351,7 @@ uint16_t connection_manager(void)
                                      default: break;
                             }
                             //mqtt_message_constructor(&message.publish.content.data[0], &remote_data[5*var_counter], 5, &mqtt_var[0]);
-                            mqtt_message_constructor(&message.publish.content.data[0], &remote_data[9*var_counter], 9, &mqtt_var[0]);
+                            mqtt_message_constructor(&message.publish.content.data[0], &remote_data[10*var_counter], 10, &mqtt_var[0]);
                             mqtt.p_len  = mqtt_serialiser_size(&serialiser, &message);
                             memset(mqtt_publish_common, 0, sizeof(mqtt_publish_common));
                             mqtt_serialiser_write(&serialiser,&message,&mqtt_publish_common[0], mqtt.p_len); //-2??
@@ -2788,10 +2832,10 @@ void mqtt_parser(char * data)
    // const char * s1_p;
     const char *str_on = "s_on";
     const char *str_off = "s_off";
-   // const char *str_h_on = "tv_museum_ch_on";
-  //  const char *str_h_off = "tv_museum_ch_off";
+    const char *str_h_on = "h_on";
+    const char *str_h_off = "h_off";
    // const char *str_rst = "rst=";
-   // const char *str_f = "{f=:";
+    const char *str_f = "{f=:";
     const char *str_d = "{d=:0.";
 
    // const char *str_eeprom = "eeprom";
@@ -2808,12 +2852,22 @@ void mqtt_parser(char * data)
     s1_p = (char*) (data_rx_mqtt);
 
 
+    if(stringSeeker(s1_p, str_h_on, 50, 4, &kptr))
+    {
+        mqtt.hand_control = 1;
+        memset (data_rx_mqtt, 0, sizeof(data_rx_mqtt));
+    }
+    else if(stringSeeker(s1_p, str_h_off, 50, 5, &kptr))
+    {
+        mqtt.hand_control = 0;
+        memset (data_rx_mqtt, 0, sizeof(data_rx_mqtt));
+        //resetLoops(&gen);
+    }
     if(stringSeeker(s1_p, str_on, 50, 4, &kptr))
     {
         mqtt.swicth = 1;
         memset (data_rx_mqtt, 0, sizeof(data_rx_mqtt));
     }
-
     else if(stringSeeker(s1_p, str_off, 50, 5, &kptr))
     {
         mqtt.swicth = 0;
@@ -2827,14 +2881,15 @@ void mqtt_parser(char * data)
         mqtt.reset = 1;
         memset (data_rx_mqtt, 0, sizeof(data_rx_mqtt));
     }
-    else if(stringSeeker(s1_p, str_f, 32, 4, &kptr))
+    */
+    else if(stringSeeker(s1_p, str_f, 55, 4, &kptr))
     {
         mqtt.freq = (data_rx_mqtt[kptr + 6] - 48)*1000.0 + (data_rx_mqtt[kptr + 7] - 48)*100.0 + (data_rx_mqtt[kptr + 8] - 48)*10.0 + (data_rx_mqtt[kptr + 9] - 48);
         mqtt.freq_h = (data_rx_mqtt[kptr + 5] - 48);
         //gen.F = 1.0*(mqtt.freq_h) + 10000.0*mqtt.freq + 100000.0;
         memset (data_rx_mqtt, 0, sizeof(data_rx_mqtt));
     }
-*/
+
     else if(stringSeeker(s1_p, str_d, 52, 6, &kptr))
     {
         if(data_rx_mqtt[kptr + 7] == 125)

@@ -98,11 +98,11 @@ interrupt void Cla1Task7(void )//Uint32 Cla1Task8 (void)
             volts[ADC_TEXT] = (AdcResult.ADCRESULT7)*0.00083;
             if(volts[ADC_TEXT] >= 2.58)
             {
-                volts[ADC_TEXT] = (volts[ADC_TEXT])*(-39.313) + 152.39;
+                volts[ADC_TEXT] = (volts[ADC_TEXT])*(-80.79) + 258.7;// volts[ADC_TEXT] = (volts[ADC_TEXT])*(-80.79) + 258.7;
             }
             else
             {
-                volts[ADC_TEXT] = (volts[ADC_TEXT])*(-119.05) + 357.14;
+                volts[ADC_TEXT] = (volts[ADC_TEXT])*(-39.45) + 152.55;// volts[ADC_TEXT] = (volts[ADC_TEXT])*(-39.45) + 152.6;
             }
 
             volts[ADC_PFC_TEMP] = (AdcResult.ADCRESULT10)*0.00083;
@@ -128,7 +128,7 @@ interrupt void Cla1Task7(void )//Uint32 Cla1Task8 (void)
            }
            fDelayLine_VDC[0] = volts[ADC_VDC]; //convert to single precision float
            fTemp += fCoeffs[0]*fDelayLine_VDC[0];
-           volts[ADC_VDC] = fTemp;//*10.0;
+           volts[ADC_VDC] = fTemp*1.09;
         i = 0;
         fTemp = 0;
 

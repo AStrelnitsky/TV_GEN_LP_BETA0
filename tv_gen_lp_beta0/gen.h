@@ -54,7 +54,8 @@ typedef struct
     uint16_t send_len;
     uint16_t swicth;
     uint16_t reset;
-    uint16_t freq, freq_h;
+    //uint16_t freq, freq_h;
+    float freq, freq_h;
     uint16_t duty;
     uint16_t hand_control;
     uint16_t eeprom;
