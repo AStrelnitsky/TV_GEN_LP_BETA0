@@ -162,6 +162,7 @@ uint32_t acqps = 6;
 uint16_t ap = 1;
 uint16_t len;
 uint16_t global_fault = 0;
+uint16_t mqtt_parser_switch = 0;
 const char *s1;
 const char *s_1310 = "\r\n";
 const char *s_13_10 = "\n";
@@ -278,6 +279,7 @@ uint16_t trx = 85;
 float ttx = 100.0;
 float dD = 10000.0;
 uint16_t OV_counter = 0;
+float burst_l = 0.045;
 //
 // Array of pointers to EPwm register structures:
 // *ePWM[0] is defined as dummy value not used in the example
@@ -554,126 +556,134 @@ __interrupt void cpu_timer1_isr(void)
    // rect_temp = (uint16_t)data_rx[6];
     if(mqtt.swicth == 1)
     {
-        if(mqtt.hand_control == 0)
-        {
-            /*
-            if(volts[ADC_VDC] >= 280.0)
+            if(mqtt.hand_control == 0)
             {
-                if(e_detector == 0)
+                /*
+                if(volts[ADC_VDC] >= 280.0)
                 {
-                   burst_duty = 0.35;
+                    if(e_detector == 0)
+                    {
+                       burst_duty = 0.35;
+                    }
+                    else
+                    {
+                       burst_duty = 0.96;
+                    }
+                }
+                else if(volts[ADC_VDC] < 200.0)
+                {
+                  e_detector = 0;
+                  burst_duty = 0.0;
+                }
+                */
+                if((state_maschine_pointer == 0) && (idc >= i_h))
+                {
+                    state_maschine_pointer = 1;
+                }
+                if((state_maschine_pointer == 1) && (idc <= i_l))
+                {
+                    state_maschine_pointer = 0;
+                }
+                if(vres_detector > 335)
+                {
+                    ++OV_counter;
                 }
                 else
                 {
-                   burst_duty = 0.96;
+                    OV_counter = 0;
                 }
-            }
-            else if(volts[ADC_VDC] < 200.0)
-            {
-              e_detector = 0;
-              burst_duty = 0.0;
-            }
-            */
-            if((state_maschine_pointer == 0) && (idc >= i_h))
-            {
-                state_maschine_pointer = 1;
-            }
-            if((state_maschine_pointer == 1) && (idc <= i_l))
-            {
-                state_maschine_pointer = 0;
-            }
-            if(vres_detector > 335)
-            {
-                ++OV_counter;
-            }
-            else
-            {
-                OV_counter = 0;
-            }
-            if((state_maschine_pointer == 0) || (OV_counter >= 10) || (vres_detector < 220))
-            {
-                gen.F = f_base;//144200.0;
-                if(esp8266.station[1].status == TCP_CLIENT_IS_NOT_CONNECTED)
+                if((state_maschine_pointer == 0) || (OV_counter >= 10) || (vres_detector < 220))
                 {
-                        gen.leds_duty[0] = 0.2;
-                        burst_duty = 0.045;
-                }
-                else if(esp8266.station[1].status == TCP_CLIENT_IS_CONNECTED)
-                {
-                    if(!(cnt % 10))
+                    gen.F = f_base;//144200.0;
+                    if(esp8266.station[1].status == TCP_CLIENT_IS_NOT_CONNECTED)
                     {
-                        if(esp8266.station[1].lost_connection < 20)
-                        {
-                            gen.leds_duty[0] = 0.0;
-                            gen.leds_duty[2] = 0.2;
-                            gen.u_out_loop.in = V_NOM;
-                            gen.u_out_loop.fbk = _IQ(vres_detector);
-                            gen.u_out_loop_en = LOOP_ENABLE;
-                            d_b = loopProcessing(&(gen.u_out_loop), &(gen.pi_u), gen.u_out_loop_en, V_NOM);
-                            burst_duty = _IQtoF(d_b);
-                        }
-                        else
-                        {
                             gen.leds_duty[0] = 0.2;
-                            gen.leds_duty[2] = 0.0;
+                            burst_duty = 0.045;
+                    }
+                    else if(esp8266.station[1].status == TCP_CLIENT_IS_CONNECTED)
+                    {
+                        if(!(cnt % 10))
+                        {
+                            if(esp8266.station[1].lost_connection < 20)
+                            {
+                                gen.leds_duty[0] = 0.0;
+                                gen.leds_duty[2] = 0.2;
+                                gen.u_out_loop.in = V_NOM;
+                                gen.u_out_loop.fbk = _IQ(vres_detector);
+                                gen.u_out_loop_en = LOOP_ENABLE;
+                                d_b = loopProcessing(&(gen.u_out_loop), &(gen.pi_u), gen.u_out_loop_en, V_NOM);
+                                burst_duty = _IQtoF(d_b);
+                            }
+                            else
+                            {
+                                gen.leds_duty[0] = 0.2;
+                                gen.leds_duty[2] = 0.0;
+                            }
+                            ++(esp8266.station[1].lost_connection);
                         }
-                        ++(esp8266.station[1].lost_connection);
                     }
                 }
+                else
+                {
+                    if(esp8266.station[1].status == TCP_CLIENT_IS_CONNECTED)
+                    {
+                      if(!(cnt % 10))
+                      {
+                          if(esp8266.station[1].lost_connection < 20)
+                          {
+                             gen.leds_duty[0] = 0.0;
+                             gen.leds_duty[2] = 0.2;
+                            // loopProcessing(&(gen.u_out_loop), &(gen.pi_u), gen.u_out_loop_en, V_NOM);
+                             gen.u_out_loop.in = V_NOM;
+                             gen.u_out_loop.fbk = _IQ(vres_detector);
+                             d_b = loopProcessing(&(gen.u_out_loop), &(gen.pi_u), gen.u_out_loop_en, V_NOM);
+                             gen.F = f_base + (0.5 - _IQtoF(d_b))*dD;
+                          }
+                          else
+                          {
+                             gen.leds_duty[0] = 0.2;
+                             gen.leds_duty[2] = 0.0;
+                          }
+                             ++(esp8266.station[1].lost_connection);
+                      }
+                    }
+                    burst_duty = amp_fix;//1.0;
+                }
             }
             else
             {
-                if(esp8266.station[1].status == TCP_CLIENT_IS_CONNECTED)
+                if(mqtt.duty <= 1)
                 {
-                  if(!(cnt % 10))
-                  {
-                      if(esp8266.station[1].lost_connection < 20)
-                      {
-                         gen.leds_duty[0] = 0.0;
-                         gen.leds_duty[2] = 0.2;
-                        // loopProcessing(&(gen.u_out_loop), &(gen.pi_u), gen.u_out_loop_en, V_NOM);
-                         gen.u_out_loop.in = V_NOM;
-                         gen.u_out_loop.fbk = _IQ(vres_detector);
-                         d_b = loopProcessing(&(gen.u_out_loop), &(gen.pi_u), gen.u_out_loop_en, V_NOM);
-                         gen.F = f_base + (0.5 - _IQtoF(d_b))*dD;
-                      }
-                      else
-                      {
-                         gen.leds_duty[0] = 0.2;
-                         gen.leds_duty[2] = 0.0;
-                      }
-                         ++(esp8266.station[1].lost_connection);
-                  }
+                    mqtt.duty = 0;
                 }
-                burst_duty = amp_fix;//1.0;
+                burst_duty = 0.01*(mqtt.duty);
+                gen.F = 1.0*(mqtt.freq) + 10000.0*mqtt.freq_h + 100000.0;
+                if(gen.F < 141000.0)
+                {
+                    gen.F = 141000.0;
+                }
+                if(gen.F > 149999.0)
+                {
+                    gen.F = 149999.0;
+                }
+                f_base = gen.F;
+                i_h = (uint16_t)(mqtt.uh);
+                i_l = (uint16_t)(mqtt.ul);
+                amp_fix = mqtt.af;
+                trx = (uint16_t)(mqtt.k1);
+                ttx = mqtt.k2;
+                gen.pi_u.kp = _IQ(mqtt.kp_u);
+                gen.pi_u.ki = _IQ(mqtt.ki_u);
+                dD = 1000.0*(mqtt.dD);
+                burst_l = mqtt.k3;
             }
         }
-        else
-        {
-            if(mqtt.duty <= 1)
-            {
-                mqtt.duty = 0;
-            }
-            burst_duty = 0.01*(mqtt.duty);
-            gen.F = 1.0*(mqtt.freq) + 10000.0*mqtt.freq_h + 100000.0;
-            if(gen.F < 141000.0)
-            {
-                gen.F = 141000.0;
-            }
-            if(gen.F > 149999.0)
-            {
-                gen.F = 149999.0;
-            }
-            f_base = gen.F;
-            i_h = (uint16_t)(mqtt.uh);
-            i_l = (uint16_t)(mqtt.ul);
-            amp_fix = mqtt.af;
-            trx = (uint16_t)(mqtt.k1);
-            ttx = mqtt.k2;
-            gen.pi_u.kp = _IQ(mqtt.kp_u);
-            gen.pi_u.ki = _IQ(mqtt.ki_u);
-            dD = 1000.0*(mqtt.dD);
-        }
+           else
+           {
+                gen.AMP = 0.0;
+                burst_duty = 0.0;
+                resetLoops(&gen);
+           }
         if(!global_fault)
         {
             if(CpuTimer1.InterruptCount >= BURST_FREQ)
@@ -735,13 +745,6 @@ __interrupt void cpu_timer1_isr(void)
        EPwm4Regs.CMPA.half.CMPA = (EPwm4Regs.TBPRD / 2);
 
        EDIS;
-   }
-   else
-   {
-        gen.AMP = 0.0;
-        burst_duty = 0.0;
-        resetLoops(&gen);
-   }
   // debug_console();
 }
 __interrupt void cpu_timer2_isr(void)
@@ -1065,8 +1068,8 @@ void gen_initial_conditions(void)
 
     mqtt.connect_p_len  = connect_message.common.length + 2;
     mqtt.state_machine = MQTT_CONNECT_TO_SERVER;
-    mqtt.uh = 4.0;
-    mqtt.ul = 2.0;
+    mqtt.uh = 10.0;
+    mqtt.ul = 0.0;
     mqtt.swicth = 1;
     mqtt.hand_control = 0;
     mqtt.k1 = 85.0;
@@ -1107,12 +1110,17 @@ void gen_initial_conditions(void)
     gen.pi_u.out = _IQ(0.0);
 
     f_base = 143200.0;
-    i_h = 4;
-    i_l = 2;
+    i_h = 10;
+    i_l = 0;
+    mqtt.duty = 0;//
     amp_fix = 1.0;
     mqtt.kp_u = 0.95;
     mqtt.ki_u = 0.1;
     mqtt.dD = 10;
+    mqtt.k3 = 0.045;
+    mqtt.af = 1.0;
+    mqtt.freq = 3200.0;
+    mqtt.freq_h = 4.0;
     resetLoops(&gen);
 }
 void init_adc(void)
@@ -2373,10 +2381,32 @@ uint16_t connection_manager(void)
                     remote_data[13] = (uint16_t)(_IQtoF(gen.pi_u.kp) * 100.0);
                     remote_data[14] = i_h;//;
                     remote_data[15] = i_l;//;
-                    remote_data[16]  = 0;//
+                    remote_data[16]  = (uint16_t)(burst_l*1000.0);//
                     remote_data[17]  = (uint16_t)(dD / 1000.0);//
                     remote_data[18]  = (uint16_t)(amp_fix*100.0);//
                     remote_data[19]  = state_maschine_pointer;//
+
+                    remote_data[20] = (uint16_t)data_rx[8];//(uint16_t)(burst_duty*100.0);
+                    remote_data[21] = (uint16_t)data_rx[9];
+                    remote_data[22] = 0;
+                    remote_data[23] = 0;
+                    remote_data[24] = 0;
+                    remote_data[25] = 0;
+                    remote_data[26]  = 0;
+                    remote_data[27]  = 0;
+                    remote_data[28]  = 0;
+                    remote_data[29]  = 0;
+
+                    remote_data[30] = 0;//(uint16_t)(burst_duty*100.0);
+                    remote_data[31] = 0;
+                    remote_data[32] = 0;
+                    remote_data[33] = 0;
+                    remote_data[34] = 0;
+                    remote_data[35] = 0;
+                    remote_data[36]  = 0;
+                    remote_data[37]  = 0;
+                    remote_data[38]  = 0;
+                    remote_data[39]  = 0;
 
                     if(esp8266.c_status == ESP8266_CWJAP_TERMINAL_OK)
                     {   if(MMQT_SUBSCRIBE_OK == (mqtt.state_machine))
@@ -2828,7 +2858,7 @@ void mqtt_manager(void)
                 break;
                 case MMQT_DATA_SEND_OK:
                 {
-                    if(var_counter < 1)
+                    if(var_counter < 2)
                     {
                        ++var_counter;
                     }
@@ -2908,138 +2938,182 @@ void mqtt_parser(char * data)
     const char *str_ul = "ul:=";
     const char *str_af = "af:=";
     const char *str_dD = "dD:=";
-  //  const char *str_k3 = "k3:=";
+    const char *str_k3 = "k3:=";
 
     s1_p = (char*) (data_rx_mqtt);
 
-
-    if(stringSeeker(s1_p, str_h_on, 50, 4, &kptr))
+    switch(mqtt_parser_switch)
     {
-        mqtt.hand_control = 1;
-        memset (data_rx_mqtt, 0, sizeof(data_rx_mqtt));
-    }
-    else if(stringSeeker(s1_p, str_h_off, 50, 5, &kptr))
-    {
-        mqtt.hand_control = 0;
-        memset (data_rx_mqtt, 0, sizeof(data_rx_mqtt));
-        //resetLoops(&gen);
-    }
-    if(stringSeeker(s1_p, str_on, 50, 4, &kptr))
-    {
-        mqtt.swicth = 1;
-        memset (data_rx_mqtt, 0, sizeof(data_rx_mqtt));
-    }
-    else if(stringSeeker(s1_p, str_off, 50, 5, &kptr))
-    {
-        mqtt.swicth = 0;
-        memset (data_rx_mqtt, 0, sizeof(data_rx_mqtt));
-        resetLoops(&gen);
-    }
-    /*
-    else if(stringSeeker(s1_p, str_rst, 32, 4, &kptr))
-    {
-        mqtt.swicth = 0;
-        mqtt.reset = 1;
-        memset (data_rx_mqtt, 0, sizeof(data_rx_mqtt));
-    }
-    */
-    else if(stringSeeker(s1_p, str_f, 55, 4, &kptr))
-    {
-        mqtt.freq = (data_rx_mqtt[kptr + 6] - 48)*1000.0 + (data_rx_mqtt[kptr + 7] - 48)*100.0 + (data_rx_mqtt[kptr + 8] - 48)*10.0 + (data_rx_mqtt[kptr + 9] - 48);
-        mqtt.freq_h = (data_rx_mqtt[kptr + 5] - 48);
-        //gen.F = 1.0*(mqtt.freq_h) + 10000.0*mqtt.freq + 100000.0;
-        memset (data_rx_mqtt, 0, sizeof(data_rx_mqtt));
-    }
-
-    else if(stringSeeker(s1_p, str_d, 52, 6, &kptr))
-    {
-        if(data_rx_mqtt[kptr + 7] == 125)
+        case 0:
         {
-            mqtt.duty = (data_rx_mqtt[kptr + 6] - 48)*10 ;
+            if(stringSeeker(s1_p, str_h_on, 50, 4, &kptr))
+                {
+                    mqtt.hand_control = 1;
+                    memset (data_rx_mqtt, 0, sizeof(data_rx_mqtt));
+                }
         }
-        else
-        {
-            mqtt.duty = (data_rx_mqtt[kptr + 6] - 48)*10 + (data_rx_mqtt[kptr + 7] - 48) ;
-        }
-       // burst_duty = 0.01*(mqtt.duty);
-        //gen.AMP = 0.01*(mqtt.duty);
-        //apm = gen.AMP;
+        break;
+        case 1:
+                {
+                     if(stringSeeker(s1_p, str_h_off, 50, 5, &kptr))
+                     {
+                            mqtt.hand_control = 0;
+                            memset (data_rx_mqtt, 0, sizeof(data_rx_mqtt));
+                            //resetLoops(&gen);
+                      }
+                }
+                break;
+        case 2:
+                        {
+                            if(stringSeeker(s1_p, str_on, 50, 4, &kptr))
+                                {
+                                    mqtt.swicth = 1;
+                                    memset (data_rx_mqtt, 0, sizeof(data_rx_mqtt));
+                                }
+                        }
+                        break;
+        case 3:
+                                {
+                                     if(stringSeeker(s1_p, str_off, 50, 5, &kptr))
+                                        {
+                                            mqtt.swicth = 0;
+                                            memset (data_rx_mqtt, 0, sizeof(data_rx_mqtt));
+                                            resetLoops(&gen);
+                                        }
+                                }
+                                break;
+        case 4:
+                                        {
+                                             if(stringSeeker(s1_p, str_f, 55, 4, &kptr))
+                                                {
+                                                    mqtt.freq = (data_rx_mqtt[kptr + 6] - 48)*1000.0 + (data_rx_mqtt[kptr + 7] - 48)*100.0 + (data_rx_mqtt[kptr + 8] - 48)*10.0 + (data_rx_mqtt[kptr + 9] - 48);
+                                                    mqtt.freq_h = (data_rx_mqtt[kptr + 5] - 48);
+                                                    //gen.F = 1.0*(mqtt.freq_h) + 10000.0*mqtt.freq + 100000.0;
+                                                    memset (data_rx_mqtt, 0, sizeof(data_rx_mqtt));
+                                                }
+                                        }
+                                        break;
+        case 5:
+                                                {
+                                                     if(stringSeeker(s1_p, str_d, 52, 6, &kptr))
+                                                        {
+                                                            if(data_rx_mqtt[kptr + 7] == 125)
+                                                            {
+                                                                mqtt.duty = (data_rx_mqtt[kptr + 6] - 48)*10 ;
+                                                            }
+                                                            else
+                                                            {
+                                                                mqtt.duty = (data_rx_mqtt[kptr + 6] - 48)*10 + (data_rx_mqtt[kptr + 7] - 48) ;
+                                                            }
+                                                           // burst_duty = 0.01*(mqtt.duty);
+                                                            //gen.AMP = 0.01*(mqtt.duty);
+                                                            //apm = gen.AMP;
 
-        memset (data_rx_mqtt, 0, sizeof(data_rx_mqtt));
-    }
-    else if(stringSeeker(s1_p, str_k1, 54, 4, &kptr))
-    {
-        mqtt.k1 = (data_rx_mqtt[kptr + 4] - 48)*100.0 + (data_rx_mqtt[kptr + 5] - 48)*10. + (data_rx_mqtt[kptr + 6] - 48);
-       // memcpy(&global_data_2.ipc_out[6], (uint16_t *)(&mqtt.k1), 2);
-        memset (data_rx_mqtt, 0, sizeof(data_rx_mqtt));
-    }
-    else if(stringSeeker(s1_p, str_k2, 54, 4, &kptr))
-    {
-        mqtt.k2 = (data_rx_mqtt[kptr + 4] - 48)*100.0 + (data_rx_mqtt[kptr + 5] - 48)*10.0 + (data_rx_mqtt[kptr + 6] - 48);
-      //  memcpy(&global_data_2.ipc_out[8], (uint16_t *)(&mqtt.k2), 2);
-        memset (data_rx_mqtt, 0, sizeof(data_rx_mqtt));
+                                                            memset (data_rx_mqtt, 0, sizeof(data_rx_mqtt));
+                                                        }
+                                                }
+                                                break;
+        case 6:
+                                                    {
+                                                        if(stringSeeker(s1_p, str_k1, 54, 4, &kptr))
+                                                            {
+                                                                mqtt.k1 = (data_rx_mqtt[kptr + 4] - 48)*100.0 + (data_rx_mqtt[kptr + 5] - 48)*10. + (data_rx_mqtt[kptr + 6] - 48);
+                                                               // memcpy(&global_data_2.ipc_out[6], (uint16_t *)(&mqtt.k1), 2);
+                                                                memset (data_rx_mqtt, 0, sizeof(data_rx_mqtt));
+                                                            }
+                                                    }
+                                                    break;
+        case 7:
+                                                            {
+                                                                if(stringSeeker(s1_p, str_k2, 54, 4, &kptr))
+                                                                    {
+                                                                        mqtt.k2 = (data_rx_mqtt[kptr + 4] - 48)*100.0 + (data_rx_mqtt[kptr + 5] - 48)*10.0 + (data_rx_mqtt[kptr + 6] - 48);
+                                                                      //  memcpy(&global_data_2.ipc_out[8], (uint16_t *)(&mqtt.k2), 2);
+                                                                        memset (data_rx_mqtt, 0, sizeof(data_rx_mqtt));
+                                                                    }
+                                                            }
+                                                            break;
+        case 8:
+                                                                   {
+                                                                        if(stringSeeker(s1_p, str_ki, 55, 4, &kptr))
+                                                                           {
+                                                                               mqtt.ki_u = (data_rx_mqtt[kptr + 4] - 48)*1.0 + (data_rx_mqtt[kptr + 6] - 48)*0.1 + (data_rx_mqtt[kptr + 7] - 48)*0.01;
+                                                                              // memcpy(&global_data_2.ipc_out[10], (uint16_t *)(&mqtt.ki_u), 2);
+                                                                               memset (data_rx_mqtt, 0, sizeof(data_rx_mqtt));
+                                                                           }
+                                                                   }
+                                                                   break;
+        case 9:
+                                                                           {
+                                                                               if(stringSeeker(s1_p, str_kp, 55, 4, &kptr))
+                                                                               {
+                                                                                    mqtt.kp_u = (data_rx_mqtt[kptr + 4] - 48)*1.0 + (data_rx_mqtt[kptr + 6] - 48)*0.1 + (data_rx_mqtt[kptr + 7] - 48)*0.01;
+                                                                                  //  memcpy(&global_data_2.ipc_out[12], (uint16_t *)(&mqtt.kp_u), 2);
+                                                                                    memset (data_rx_mqtt, 0, sizeof(data_rx_mqtt));
+                                                                               }
+                                                                           }
+                                                                           break;
+        case 10:
+                                                                                   {
+                                                                                       if(stringSeeker(s1_p, str_uh, 55, 4, &kptr))
+                                                                                           {
+                                                                                                //mqtt.uh = (data_rx_mqtt[kptr + 6] - 48)*0.1 + (data_rx_mqtt[kptr + 7] - 48)*0.01;
+                                                                                               mqtt.uh = (data_rx_mqtt[kptr + 6] - 48)*10.0 + (data_rx_mqtt[kptr + 7] - 48);//mqtt.uh = (data_rx_mqtt[kptr + 6] - 48)*0.1 + (data_rx_mqtt[kptr + 7] - 48)*0.01;
+                                                                                               memset (data_rx_mqtt, 0, sizeof(data_rx_mqtt));
+                                                                                           }
+                                                                                   }
+                                                                                   break;
+        case 11:
+                                                                                           {
+                                                                                              if(stringSeeker(s1_p, str_ul, 55, 4, &kptr))
+                                                                                                   {
+                                                                                                       mqtt.ul = (data_rx_mqtt[kptr + 6] - 48)*10.0 + (data_rx_mqtt[kptr + 7] - 48);//mqtt.ul = (data_rx_mqtt[kptr + 6] - 48)*0.1 + (data_rx_mqtt[kptr + 7] - 48)*0.01;
+                                                                                                       memset (data_rx_mqtt, 0, sizeof(data_rx_mqtt));
+                                                                                                   }
+                                                                                           }
+                                                                                           break;
+        case 12:
+                                                                                                   {
+                                                                                                      if(stringSeeker(s1_p, str_k3, 55, 4, &kptr))
+                                                                                                          {
+                                                                                                                mqtt.k3 = (data_rx_mqtt[kptr + 4] - 48)*1.0 + (data_rx_mqtt[kptr + 6] - 48)*0.1 + (data_rx_mqtt[kptr + 7] - 48)*0.01 + (data_rx_mqtt[kptr + 8] - 48)*0.001;
+                                                                                                              //  memcpy(&global_data_2.ipc_out[18], (uint16_t *)(&mqtt.k3), 2);
+                                                                                                                memset (data_rx_mqtt, 0, sizeof(data_rx_mqtt));
+                                                                                                          }
+                                                                                                   }
+                                                                                                   break;
+        case 13:
+                                                                                                           {
+                                                                                                                if(stringSeeker(s1_p, str_dD, 55, 4, &kptr))
+                                                                                                                   {
+                                                                                                                          mqtt.dD = (data_rx_mqtt[kptr + 4] - 48)*10 + (data_rx_mqtt[kptr + 5] - 48);
+                                                                                                                       //   global_data_2.ipc_out[20] = (uint16_t)mqtt.dD;
+                                                                                                                          memset (data_rx_mqtt, 0, sizeof(data_rx_mqtt));
+                                                                                                                   }
+                                                                                                           }
+                                                                                                           break;
+        case 14:
+                                                                                                                   {
+                                                                                                                       if(stringSeeker(s1_p, str_af, 55, 4, &kptr))
+                                                                                                                          {
+                                                                                                                                 mqtt.af = (data_rx_mqtt[kptr + 6] - 48)*0.1 + (data_rx_mqtt[kptr + 7] - 48)*0.01;
+                                                                                                                               //  memcpy(&global_data_2.ipc_out[23], (uint16_t *)(&mqtt.af), 2);
+                                                                                                                                 memset (data_rx_mqtt, 0, sizeof(data_rx_mqtt));
+                                                                                                                          }
+                                                                                                                   }
+                                                                                                                   break;
+        default: break;
     }
 
-    /*
-    else if(stringSeeker(s1, str_eeprom, 32, 6, &kptr))
+    if(mqtt_parser_switch > 15)
     {
-        //global_data_2.ipc_out[26] = 1;
-        memset (data_rx_mqtt, 0, sizeof(data_rx_mqtt));
+        mqtt_parser_switch = 0;
     }
-       */
-    else if(stringSeeker(s1_p, str_ki, 55, 4, &kptr))
+    else
     {
-        mqtt.ki_u = (data_rx_mqtt[kptr + 4] - 48)*1.0 + (data_rx_mqtt[kptr + 6] - 48)*0.1 + (data_rx_mqtt[kptr + 7] - 48)*0.01;
-       // memcpy(&global_data_2.ipc_out[10], (uint16_t *)(&mqtt.ki_u), 2);
-        memset (data_rx_mqtt, 0, sizeof(data_rx_mqtt));
-    }
-    else if(stringSeeker(s1_p, str_kp, 55, 4, &kptr))
-    {
-         mqtt.kp_u = (data_rx_mqtt[kptr + 4] - 48)*1.0 + (data_rx_mqtt[kptr + 6] - 48)*0.1 + (data_rx_mqtt[kptr + 7] - 48)*0.01;
-       //  memcpy(&global_data_2.ipc_out[12], (uint16_t *)(&mqtt.kp_u), 2);
-         memset (data_rx_mqtt, 0, sizeof(data_rx_mqtt));
+        ++mqtt_parser_switch;
     }
 
-    else if(stringSeeker(s1_p, str_uh, 55, 4, &kptr))
-    {
-         //mqtt.uh = (data_rx_mqtt[kptr + 6] - 48)*0.1 + (data_rx_mqtt[kptr + 7] - 48)*0.01;
-        mqtt.uh = (data_rx_mqtt[kptr + 6] - 48)*10.0 + (data_rx_mqtt[kptr + 7] - 48);//mqtt.uh = (data_rx_mqtt[kptr + 6] - 48)*0.1 + (data_rx_mqtt[kptr + 7] - 48)*0.01;
-        memset (data_rx_mqtt, 0, sizeof(data_rx_mqtt));
-    }
-    else if(stringSeeker(s1_p, str_ul, 55, 4, &kptr))
-    {
-        mqtt.ul = (data_rx_mqtt[kptr + 6] - 48)*10.0 + (data_rx_mqtt[kptr + 7] - 48);//mqtt.ul = (data_rx_mqtt[kptr + 6] - 48)*0.1 + (data_rx_mqtt[kptr + 7] - 48)*0.01;
-        memset (data_rx_mqtt, 0, sizeof(data_rx_mqtt));
-    }
-    /*
-    else if(stringSeeker(s1, str_k3, 32, 4, &kptr))
-    {
-          mqtt.k3 = (data_rx_mqtt[kptr + 4] - 48)*1.0 + (data_rx_mqtt[kptr + 6] - 48)*0.1 + (data_rx_mqtt[kptr + 7] - 48)*0.01;
-        //  memcpy(&global_data_2.ipc_out[18], (uint16_t *)(&mqtt.k3), 2);
-          memset (data_rx_mqtt, 0, sizeof(data_rx_mqtt));
-    }
-    */
-    else if(stringSeeker(s1_p, str_dD, 55, 4, &kptr))
-    {
-           mqtt.dD = (data_rx_mqtt[kptr + 4] - 48)*10 + (data_rx_mqtt[kptr + 5] - 48);
-        //   global_data_2.ipc_out[20] = (uint16_t)mqtt.dD;
-           memset (data_rx_mqtt, 0, sizeof(data_rx_mqtt));
-    }
-    else if(stringSeeker(s1_p, str_af, 55, 4, &kptr))
-    {
-           mqtt.af = (data_rx_mqtt[kptr + 6] - 48)*0.1 + (data_rx_mqtt[kptr + 7] - 48)*0.01;
-         //  memcpy(&global_data_2.ipc_out[23], (uint16_t *)(&mqtt.af), 2);
-           memset (data_rx_mqtt, 0, sizeof(data_rx_mqtt));
-    }
-
-    /*
-    global_data_2.ipc_out[0] = mqtt.swicth;
-    global_data_2.ipc_out[1] = mqtt.reset;
-    global_data_2.ipc_out[2] = (uint16_t)mqtt.duty;
-    global_data_2.ipc_out[3] = mqtt.hand_control;
-    global_data_2.ipc_out[4] = (uint16_t)mqtt.freq;
-    global_data_2.ipc_out[5] = (uint16_t)mqtt.freq_h;
-    */
 
 }
 uint16_t waitATReceive_nonbloking(const char * at, uint16_t len, uint16_t timeout)
