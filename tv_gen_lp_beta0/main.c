@@ -271,6 +271,11 @@ uint16_t tim_counter = 0;
 int MEP_ScaleFactor;
 uint16_t publish_counter = 0;
 uint16_t state_maschine_pointer = 0;
+float f_base = 0.0;
+uint16_t i_h, i_l;
+float amp_fix = 0.0;
+uint16_t trx = 85;
+float ttx = 100.0;
 //
 // Array of pointers to EPwm register structures:
 // *ePWM[0] is defined as dummy value not used in the example
@@ -373,7 +378,7 @@ int main(void)
 
         wifi_init_flag = 1;
         CpuTimer1.RegsAddr->PRD.all = 29999;//CpuTimer1.RegsAddr->PRD.all = 599999;
-        gen.F = 143200;//144200.0;//71600.0;
+        gen.F = f_base;//144200.0;//71600.0;
         while(1)
         {
             GpioDataRegs.GPATOGGLE.bit.GPIO4 |= 1;
@@ -414,11 +419,11 @@ int main(void)
             {
                 global_fault = 0;
             }
-            if(volts[ADC_TEXT] > 95.0)
+            if(volts[ADC_TEXT] > ttx)
             {
                 global_fault = 1;
             }
-            else if(volts[ADC_TEXT] < 90.0)
+            else if(volts[ADC_TEXT] < (ttx - 5.0))
             {
                 global_fault = 0;
             }
@@ -567,17 +572,17 @@ __interrupt void cpu_timer1_isr(void)
               burst_duty = 0.0;
             }
             */
-            if((state_maschine_pointer == 0) && (idc >= 4))
+            if((state_maschine_pointer == 0) && (idc >= i_h))
             {
                 state_maschine_pointer = 1;
             }
-            if((state_maschine_pointer == 1) && (idc <= 2))
+            if((state_maschine_pointer == 1) && (idc <= i_l))
             {
                 state_maschine_pointer = 0;
             }
-            if((state_maschine_pointer == 0) || (vres_detector >= 330) || (vres_detector < 220))
+            if((state_maschine_pointer == 0) || (vres_detector >= 335) || (vres_detector < 220))
             {
-                gen.F = 143200.0;//144200.0;
+                gen.F = f_base;//144200.0;
                 if(esp8266.station[1].status == TCP_CLIENT_IS_NOT_CONNECTED)
                 {
                         gen.leds_duty[0] = 0.2;
@@ -620,7 +625,7 @@ __interrupt void cpu_timer1_isr(void)
                          gen.u_out_loop.in = V_NOM;
                          gen.u_out_loop.fbk = _IQ(vres_detector);
                          d_b = loopProcessing(&(gen.u_out_loop), &(gen.pi_u), gen.u_out_loop_en, V_NOM);
-                         gen.F = 143200.0 + (0.1 - _IQtoF(d_b))*3000.0;
+                         gen.F = f_base + (0.2 - _IQtoF(d_b))*4000.0;
                       }
                       else
                       {
@@ -630,7 +635,7 @@ __interrupt void cpu_timer1_isr(void)
                          ++(esp8266.station[1].lost_connection);
                   }
                 }
-                burst_duty = 1.0;
+                burst_duty = amp_fix;//1.0;
             }
         }
         else
@@ -649,6 +654,14 @@ __interrupt void cpu_timer1_isr(void)
             {
                 gen.F = 149999.0;
             }
+            f_base = gen.F;
+            i_h = (uint16_t)(mqtt.uh);
+            i_l = (uint16_t)(mqtt.ul);
+            amp_fix = mqtt.af;
+            trx = (uint16_t)(mqtt.k1);
+            ttx = mqtt.k2;
+            gen.pi_u.kp = _IQ(mqtt.kp_u);
+            gen.pi_u.ki = _IQ(mqtt.ki_u);
         }
         if(!global_fault)
         {
@@ -1041,12 +1054,12 @@ void gen_initial_conditions(void)
 
     mqtt.connect_p_len  = connect_message.common.length + 2;
     mqtt.state_machine = MQTT_CONNECT_TO_SERVER;
-    mqtt.uh = 22.0;
-    mqtt.ul = 23.0;
+    mqtt.uh = 4.0;
+    mqtt.ul = 2.0;
     mqtt.swicth = 1;
     mqtt.hand_control = 0;
-    mqtt.k1 = 24.0;
-    mqtt.k2 = 22.0;
+    mqtt.k1 = 85.0;
+    mqtt.k2 = 100.0;
     mqtt_serialiser_write(&serialiser, &connect_message, &mqtt_connect[0], mqtt.connect_p_len); //-2??
 
     subscribe_message.common.type = MQTT_TYPE_SUBSCRIBE;
@@ -1082,6 +1095,12 @@ void gen_initial_conditions(void)
     gen.pi_u.kp = _IQ(0.2);
     gen.pi_u.out = _IQ(0.0);
 
+    f_base = 143200.0;
+    i_h = 4;
+    i_l = 2;
+    amp_fix = 1.0;
+    mqtt.kp_u = 0.95;
+    mqtt.ki_u = 0.1;
     resetLoops(&gen);
 }
 void init_adc(void)
@@ -2336,6 +2355,17 @@ uint16_t connection_manager(void)
                     remote_data[8]  = (uint16_t)(volts[ADC_TEXT]);
                     remote_data[9]  = (uint16_t)((gen.F - 140000.0) / 10.0);
 
+                    remote_data[10] = trx;//(uint16_t)(burst_duty*100.0);
+                    remote_data[11] = (uint16_t)ttx;//;
+                    remote_data[12] = (uint16_t)(_IQtoF(gen.pi_u.ki) * 100.0);//
+                    remote_data[13] = (uint16_t)(_IQtoF(gen.pi_u.kp) * 100.0);
+                    remote_data[14] = i_h;//;
+                    remote_data[15] = i_l;//;
+                    remote_data[16]  = 0;//
+                    remote_data[17]  = 0;//
+                    remote_data[18]  = (uint16_t)(amp_fix*100.0);//
+                    remote_data[19]  = state_maschine_pointer;//
+
                     if(esp8266.c_status == ESP8266_CWJAP_TERMINAL_OK)
                     {   if(MMQT_SUBSCRIBE_OK == (mqtt.state_machine))
                         {
@@ -2786,7 +2816,7 @@ void mqtt_manager(void)
                 break;
                 case MMQT_DATA_SEND_OK:
                 {
-                    if(var_counter < 0)
+                    if(var_counter < 1)
                     {
                        ++var_counter;
                     }
@@ -2858,13 +2888,13 @@ void mqtt_parser(char * data)
     const char *str_d = "{d=:0.";
 
    // const char *str_eeprom = "eeprom";
-   // const char *str_k1 = "k1:=";
-   // const char *str_k2 = "k2:=";
-   // const char *str_ki = "ki:=";
-  //  const char *str_kp = "kp:=";
+    const char *str_k1 = "k1:=";
+    const char *str_k2 = "k2:=";
+    const char *str_ki = "ki:=";
+    const char *str_kp = "kp:=";
     const char *str_uh = "uh:=";
     const char *str_ul = "ul:=";
-  //  const char *str_af = "af:=";
+    const char *str_af = "af:=";
   //  const char *str_dD = "dD:=";
   //  const char *str_k3 = "k3:=";
 
@@ -2925,53 +2955,39 @@ void mqtt_parser(char * data)
 
         memset (data_rx_mqtt, 0, sizeof(data_rx_mqtt));
     }
+    else if(stringSeeker(s1_p, str_k1, 54, 4, &kptr))
+    {
+        mqtt.k1 = (data_rx_mqtt[kptr + 4] - 48)*100.0 + (data_rx_mqtt[kptr + 5] - 48)*10. + (data_rx_mqtt[kptr + 6] - 48);
+       // memcpy(&global_data_2.ipc_out[6], (uint16_t *)(&mqtt.k1), 2);
+        memset (data_rx_mqtt, 0, sizeof(data_rx_mqtt));
+    }
+    else if(stringSeeker(s1_p, str_k2, 54, 4, &kptr))
+    {
+        mqtt.k2 = (data_rx_mqtt[kptr + 4] - 48)*100.0 + (data_rx_mqtt[kptr + 5] - 48)*10.0 + (data_rx_mqtt[kptr + 6] - 48);
+      //  memcpy(&global_data_2.ipc_out[8], (uint16_t *)(&mqtt.k2), 2);
+        memset (data_rx_mqtt, 0, sizeof(data_rx_mqtt));
+    }
+
     /*
-    else if(stringSeeker(s1, str_h_on, 32, 15, &kptr))
-    {
-        mqtt.hand_control = 1;
-        memset (data_rx_mqtt, 0, sizeof(data_rx_mqtt));
-    }
-    else if(stringSeeker(s1, str_h_off, 32, 16, &kptr))
-    {
-        mqtt.hand_control = 0;
-        memset (data_rx_mqtt, 0, sizeof(data_rx_mqtt));
-    }
     else if(stringSeeker(s1, str_eeprom, 32, 6, &kptr))
     {
         //global_data_2.ipc_out[26] = 1;
         memset (data_rx_mqtt, 0, sizeof(data_rx_mqtt));
     }
-
-    else if(stringSeeker(s1, str_k1, 54, 4, &kptr))
+       */
+    else if(stringSeeker(s1_p, str_ki, 55, 4, &kptr))
     {
-        mqtt.k1 = (data_rx_mqtt[kptr + 4] - 48)*1.0 + (data_rx_mqtt[kptr + 6] - 48)*0.1 + (data_rx_mqtt[kptr + 7] - 48)*0.01;
-       // memcpy(&global_data_2.ipc_out[6], (uint16_t *)(&mqtt.k1), 2);
-        memset (data_rx_mqtt, 0, sizeof(data_rx_mqtt));
-    }
-    else if(stringSeeker(s1, str_k2, 54, 4, &kptr))
-    {
-        mqtt.k2 = (data_rx_mqtt[kptr + 4] - 48)*1.0 + (data_rx_mqtt[kptr + 6] - 48)*0.1 + (data_rx_mqtt[kptr + 7] - 48)*0.01;
-        if(data_rx_mqtt[kptr + 3] == 45)
-        {
-            mqtt.k2 = -1.0*mqtt.k2;
-        }
-      //  memcpy(&global_data_2.ipc_out[8], (uint16_t *)(&mqtt.k2), 2);
-        memset (data_rx_mqtt, 0, sizeof(data_rx_mqtt));
-    }
-
-    else if(stringSeeker(s1, str_ki, 32, 4, &kptr))
-    {
-        mqtt.ki_u = (data_rx_mqtt[kptr + 7] - 48)*0.01 + (data_rx_mqtt[kptr + 8] - 48)*0.001 + (data_rx_mqtt[kptr + 9] - 48)*0.0001;
+        mqtt.ki_u = (data_rx_mqtt[kptr + 4] - 48)*1.0 + (data_rx_mqtt[kptr + 6] - 48)*0.1 + (data_rx_mqtt[kptr + 7] - 48)*0.01;
        // memcpy(&global_data_2.ipc_out[10], (uint16_t *)(&mqtt.ki_u), 2);
         memset (data_rx_mqtt, 0, sizeof(data_rx_mqtt));
     }
-    else if(stringSeeker(s1, str_kp, 32, 4, &kptr))
+    else if(stringSeeker(s1_p, str_kp, 55, 4, &kptr))
     {
          mqtt.kp_u = (data_rx_mqtt[kptr + 4] - 48)*1.0 + (data_rx_mqtt[kptr + 6] - 48)*0.1 + (data_rx_mqtt[kptr + 7] - 48)*0.01;
        //  memcpy(&global_data_2.ipc_out[12], (uint16_t *)(&mqtt.kp_u), 2);
          memset (data_rx_mqtt, 0, sizeof(data_rx_mqtt));
     }
-    */
+
     else if(stringSeeker(s1_p, str_uh, 55, 4, &kptr))
     {
          //mqtt.uh = (data_rx_mqtt[kptr + 6] - 48)*0.1 + (data_rx_mqtt[kptr + 7] - 48)*0.01;
@@ -2996,13 +3012,14 @@ void mqtt_parser(char * data)
         //   global_data_2.ipc_out[20] = (uint16_t)mqtt.dD;
            memset (data_rx_mqtt, 0, sizeof(data_rx_mqtt));
     }
-    else if(stringSeeker(s1, str_af, 32, 4, &kptr))
+    */
+    else if(stringSeeker(s1_p, str_af, 55, 4, &kptr))
     {
            mqtt.af = (data_rx_mqtt[kptr + 6] - 48)*0.1 + (data_rx_mqtt[kptr + 7] - 48)*0.01;
          //  memcpy(&global_data_2.ipc_out[23], (uint16_t *)(&mqtt.af), 2);
            memset (data_rx_mqtt, 0, sizeof(data_rx_mqtt));
     }
-    */
+
     /*
     global_data_2.ipc_out[0] = mqtt.swicth;
     global_data_2.ipc_out[1] = mqtt.reset;
