@@ -101,7 +101,7 @@ uint16_t vres_detector = 0;
 #define USER_DEBUG 1
 #define WIFI_TIMER_OVERFLOW 10//0x200//0x1FF//0x1FF
 #define WIFI_INIT_TIMER_OVERFLOW 0x250//0x1FF
-#define STATUS_Q_MQTT 200//200//10//20//10//100
+#define STATUS_Q_MQTT 100//200//10//20//10//100
 
 //__interrupt void cpu_timer0_isr(void);
 __interrupt void cpu_timer1_isr(void);
@@ -373,7 +373,7 @@ int main(void)
 
         wifi_init_flag = 1;
         CpuTimer1.RegsAddr->PRD.all = 29999;//CpuTimer1.RegsAddr->PRD.all = 599999;
-        gen.F = 144200.0;//71600.0;
+        gen.F = 143200;//144200.0;//71600.0;
         while(1)
         {
             GpioDataRegs.GPATOGGLE.bit.GPIO4 |= 1;
@@ -398,14 +398,31 @@ int main(void)
             {
                  global_fault = 0;
             }
-            if((data_rx[6] > 85) || (data_rx[7] > 85) || ((volts[ADC_TEXT]) > 85.0))
+            if(data_rx[6] > 85)
             {
                 global_fault = 1;
             }
-            else
+            else if(data_rx[6] < 80)
             {
                 global_fault = 0;
             }
+            if(data_rx[7] > 85)
+            {
+                global_fault = 1;
+            }
+            else if(data_rx[7] < 80)
+            {
+                global_fault = 0;
+            }
+            if(volts[ADC_TEXT] > 95.0)
+            {
+                global_fault = 1;
+            }
+            else if(volts[ADC_TEXT] < 90.0)
+            {
+                global_fault = 0;
+            }
+
             SFO();
         }
 }
@@ -560,7 +577,7 @@ __interrupt void cpu_timer1_isr(void)
             }
             if((state_maschine_pointer == 0) || (vres_detector >= 330) || (vres_detector < 220))
             {
-                gen.F = 144200.0;
+                gen.F = 143200.0;//144200.0;
                 if(esp8266.station[1].status == TCP_CLIENT_IS_NOT_CONNECTED)
                 {
                         gen.leds_duty[0] = 0.2;
@@ -600,8 +617,10 @@ __interrupt void cpu_timer1_isr(void)
                          gen.leds_duty[0] = 0.0;
                          gen.leds_duty[2] = 0.2;
                         // loopProcessing(&(gen.u_out_loop), &(gen.pi_u), gen.u_out_loop_en, V_NOM);
+                         gen.u_out_loop.in = V_NOM;
+                         gen.u_out_loop.fbk = _IQ(vres_detector);
                          d_b = loopProcessing(&(gen.u_out_loop), &(gen.pi_u), gen.u_out_loop_en, V_NOM);
-                         gen.F = 144200.0 - ((_IQtoF(d_b))*1000.0);
+                         gen.F = 143200.0 + (0.1 - _IQtoF(d_b))*3000.0;
                       }
                       else
                       {
