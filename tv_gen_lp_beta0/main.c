@@ -276,6 +276,8 @@ uint16_t i_h, i_l;
 float amp_fix = 0.0;
 uint16_t trx = 85;
 float ttx = 100.0;
+float dD = 10000.0;
+uint16_t OV_counter = 0;
 //
 // Array of pointers to EPwm register structures:
 // *ePWM[0] is defined as dummy value not used in the example
@@ -580,13 +582,21 @@ __interrupt void cpu_timer1_isr(void)
             {
                 state_maschine_pointer = 0;
             }
-            if((state_maschine_pointer == 0) || (vres_detector >= 335) || (vres_detector < 220))
+            if(vres_detector > 335)
+            {
+                ++OV_counter;
+            }
+            else
+            {
+                OV_counter = 0;
+            }
+            if((state_maschine_pointer == 0) || (OV_counter >= 10) || (vres_detector < 220))
             {
                 gen.F = f_base;//144200.0;
                 if(esp8266.station[1].status == TCP_CLIENT_IS_NOT_CONNECTED)
                 {
                         gen.leds_duty[0] = 0.2;
-                        burst_duty = 0.06;
+                        burst_duty = 0.045;
                 }
                 else if(esp8266.station[1].status == TCP_CLIENT_IS_CONNECTED)
                 {
@@ -625,7 +635,7 @@ __interrupt void cpu_timer1_isr(void)
                          gen.u_out_loop.in = V_NOM;
                          gen.u_out_loop.fbk = _IQ(vres_detector);
                          d_b = loopProcessing(&(gen.u_out_loop), &(gen.pi_u), gen.u_out_loop_en, V_NOM);
-                         gen.F = f_base + (0.2 - _IQtoF(d_b))*4000.0;
+                         gen.F = f_base + (0.5 - _IQtoF(d_b))*dD;
                       }
                       else
                       {
@@ -662,6 +672,7 @@ __interrupt void cpu_timer1_isr(void)
             ttx = mqtt.k2;
             gen.pi_u.kp = _IQ(mqtt.kp_u);
             gen.pi_u.ki = _IQ(mqtt.ki_u);
+            dD = 1000.0*(mqtt.dD);
         }
         if(!global_fault)
         {
@@ -1101,6 +1112,7 @@ void gen_initial_conditions(void)
     amp_fix = 1.0;
     mqtt.kp_u = 0.95;
     mqtt.ki_u = 0.1;
+    mqtt.dD = 10;
     resetLoops(&gen);
 }
 void init_adc(void)
@@ -2362,7 +2374,7 @@ uint16_t connection_manager(void)
                     remote_data[14] = i_h;//;
                     remote_data[15] = i_l;//;
                     remote_data[16]  = 0;//
-                    remote_data[17]  = 0;//
+                    remote_data[17]  = (uint16_t)(dD / 1000.0);//
                     remote_data[18]  = (uint16_t)(amp_fix*100.0);//
                     remote_data[19]  = state_maschine_pointer;//
 
@@ -2895,7 +2907,7 @@ void mqtt_parser(char * data)
     const char *str_uh = "uh:=";
     const char *str_ul = "ul:=";
     const char *str_af = "af:=";
-  //  const char *str_dD = "dD:=";
+    const char *str_dD = "dD:=";
   //  const char *str_k3 = "k3:=";
 
     s1_p = (char*) (data_rx_mqtt);
@@ -3006,13 +3018,13 @@ void mqtt_parser(char * data)
         //  memcpy(&global_data_2.ipc_out[18], (uint16_t *)(&mqtt.k3), 2);
           memset (data_rx_mqtt, 0, sizeof(data_rx_mqtt));
     }
-    else if(stringSeeker(s1, str_dD, 32, 4, &kptr))
+    */
+    else if(stringSeeker(s1_p, str_dD, 55, 4, &kptr))
     {
-           mqtt.dD = (data_rx_mqtt[kptr + 4] - 48)*100 + (data_rx_mqtt[kptr + 5] - 48)*10 + (data_rx_mqtt[kptr + 6] - 48);
+           mqtt.dD = (data_rx_mqtt[kptr + 4] - 48)*10 + (data_rx_mqtt[kptr + 5] - 48);
         //   global_data_2.ipc_out[20] = (uint16_t)mqtt.dD;
            memset (data_rx_mqtt, 0, sizeof(data_rx_mqtt));
     }
-    */
     else if(stringSeeker(s1_p, str_af, 55, 4, &kptr))
     {
            mqtt.af = (data_rx_mqtt[kptr + 6] - 48)*0.1 + (data_rx_mqtt[kptr + 7] - 48)*0.01;
