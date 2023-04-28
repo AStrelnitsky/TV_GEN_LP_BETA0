@@ -277,7 +277,7 @@ uint16_t i_h, i_l;
 float amp_fix = 0.0;
 uint16_t trx = 85;
 float ttx = 100.0;
-float dD = 10000.0;
+float dD = 12000.0;
 uint16_t OV_counter = 0;
 float burst_l = 0.045;
 //
@@ -576,6 +576,7 @@ __interrupt void cpu_timer1_isr(void)
                   burst_duty = 0.0;
                 }
                 */
+                /*
                 if((state_maschine_pointer == 0) && (idc >= i_h))
                 {
                     state_maschine_pointer = 1;
@@ -584,6 +585,7 @@ __interrupt void cpu_timer1_isr(void)
                 {
                     state_maschine_pointer = 0;
                 }
+                */
                 if(vres_detector > 335)
                 {
                     ++OV_counter;
@@ -597,11 +599,13 @@ __interrupt void cpu_timer1_isr(void)
                     gen.F = f_base;//144200.0;
                     if(esp8266.station[1].status == TCP_CLIENT_IS_NOT_CONNECTED)
                     {
+                            state_maschine_pointer = 0;
                             gen.leds_duty[0] = 0.2;
-                            burst_duty = 0.045;
+                            burst_duty = burst_l;
                     }
                     else if(esp8266.station[1].status == TCP_CLIENT_IS_CONNECTED)
                     {
+                        state_maschine_pointer = 1;
                         if(!(cnt % 10))
                         {
                             if(esp8266.station[1].lost_connection < 20)
@@ -658,13 +662,13 @@ __interrupt void cpu_timer1_isr(void)
                 }
                 burst_duty = 0.01*(mqtt.duty);
                 gen.F = 1.0*(mqtt.freq) + 10000.0*mqtt.freq_h + 100000.0;
-                if(gen.F < 141000.0)
+                if(gen.F < 140000.0)
                 {
-                    gen.F = 141000.0;
+                    gen.F = 140000.0;
                 }
-                if(gen.F > 149999.0)
+                if(gen.F > 169999.0)
                 {
-                    gen.F = 149999.0;
+                    gen.F = 169999.0;
                 }
                 f_base = gen.F;
                 i_h = (uint16_t)(mqtt.uh);
@@ -1116,7 +1120,7 @@ void gen_initial_conditions(void)
     amp_fix = 1.0;
     mqtt.kp_u = 0.95;
     mqtt.ki_u = 0.1;
-    mqtt.dD = 10;
+    mqtt.dD = 12;
     mqtt.k3 = 0.045;
     mqtt.af = 1.0;
     mqtt.freq = 3200.0;
