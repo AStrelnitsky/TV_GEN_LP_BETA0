@@ -136,14 +136,14 @@ SECTIONS
     .TI.ramfunc : {} LOAD = FLASHD,
                          RUN = RAML0L1,//RAML0,
                          LOAD_START(_RamfuncsLoadStart),
-                         LOAD_END(_RamfuncsLoadEnd),
+                         LOAD_SIZE(_RamfuncsLoadSize),
                          RUN_START(_RamfuncsRunStart),
                          PAGE = 0
    #else
    ramfuncs            : LOAD = FLASHD,
                          RUN = RAML0L1,//RAML0,
                          LOAD_START(_RamfuncsLoadStart),
-                         LOAD_END(_RamfuncsLoadEnd),
+                         LOAD_SIZE(_RamfuncsLoadSize),
                          RUN_START(_RamfuncsRunStart),
                          PAGE = 0   
    #endif
@@ -171,7 +171,7 @@ SECTIONS
    IQmath              : > FLASHF      			PAGE = 0            /* Math Code */
    IQmathTables        : > IQTABLES,   			PAGE = 0, TYPE = NOLOAD
 
-   Cla1Prog         : LOAD = FLASHE,//RAML0L1,
+   Cla1Prog         : LOAD = FLASHF,//RAML0L1,
                       RUN = RAML3,
                       LOAD_START(_Cla1funcsLoadStart),
                       LOAD_SIZE(_Cla1funcsLoadSize)

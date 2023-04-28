@@ -27,6 +27,8 @@
 #define AMP_LIMIT _IQ(1.0)
 
 void  reprom_ID_read(void);
+extern void flash_processing(void);
+
 typedef struct
 {
     uint64_t ID;
@@ -40,6 +42,11 @@ typedef struct
     uint16_t read_rom_counter;
     char id[7];
 }DS2502R;
-
+typedef struct
+ {
+     Uint16 BlockSize;
+     Uint32 DestAddr;
+     Uint32 ProgBuffAddr;
+ } HEADER ;
 
 #endif /* MAIN_H_ */

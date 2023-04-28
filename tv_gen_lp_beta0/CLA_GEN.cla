@@ -139,7 +139,7 @@ interrupt void Cla1Task7(void )//Uint32 Cla1Task8 (void)
 
                fTemp += fCoeffs[i]*fDelayLine[i];
            }
-           fDelayLine[0] = (((((float)(AdcResult.ADCRESULT9))*0.00083) - 1.65)*(160.0));//volts[ADC_IDC]; //convert to single precision float
+           fDelayLine[0] = (((((float)(AdcResult.ADCRESULT9))*0.00083) - 1.68)*(160.0));//volts[ADC_IDC]; //convert to single precision float
            fTemp += fCoeffs[0]*fDelayLine[0];
            volts[ADC_IDC] = fTemp;
         }

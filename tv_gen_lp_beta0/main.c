@@ -22,6 +22,8 @@
 #include "DSP2803x_GlobalPrototypes.h"
 #include "IQmathLib.h"
 #include "SFO_V6.h"
+#include "Flash2803x_API_Config.h"
+#include "Flash2803x_API_Library.h"
 //#include "F2803x_Cla_defines.h"
 //
 #pragma DATA_SECTION(isr_counter,   "Cla1ToCpuMsgRAM");
@@ -36,10 +38,14 @@
 #pragma DATA_SECTION (vhb, "Cla1ToCpuMsgRAM");
 #pragma DATA_SECTION (sns, "Cla1ToCpuMsgRAM");
 #pragma DATA_SECTION (ihb_ls, "Cla1ToCpuMsgRAM");
+#pragma CODE_SECTION(flash_processing, "ramfuncs");
+
+
 #define LOWPASS 1
 #define PERIOD_DIVIDER_TIM 1
 #define PERIOD_MULTIPLIER_TIM 32
 #define BURST_FREQ 100
+#define PROG_ADDR 0x3EE000
 
 #pragma DATA_SECTION(fCoeffs,"Cla1ToCpuMsgRAM");
 float fCoeffs[FILTER_LEN];//{0.0212, 0.00212, 0.00213, 0.00212, 0.0212};// {0.0625, 0.25, 0.375, 0.25, 0.0625};//{0.0625, 0.25, 0.375, 0.25, 0.0625};
@@ -150,6 +156,7 @@ _iq loopProcessing(LOOP * loop, PI_REG * pi, LOOPS_ENABLE flag, _iq norm);
 inline _iq piProcessing(PI_REG * pi);
 _iq integratorProcessing(INTEGRATOR_Q *i);
 void resetLoops(GEN_STRUCT * d);
+
 uint32_t main_counter = 0;
 uint16_t SINTOP1[2];
 uint16_t SINBOT1[2];
@@ -280,6 +287,15 @@ float ttx = 100.0;
 float dD = 12000.0;
 uint16_t OV_counter = 0;
 float burst_l = 0.045;
+uint16_t flash_tx = 0;
+HEADER BlockHeader;
+Uint16 progBuf[64] = {1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,17,16,19,20,21,22,23,24,25,26,27,28,29,30,31,32,33,34,35,36,37,38,39,40,41,42,43,44,45,46,47,48,49,50,51,52,53,54,55,56,57,58,59,60,61,62,63,64};
+Uint16 readBuf[64];
+extern Uint16 RamfuncsRunStart;
+extern Uint16 RamfuncsLoadStart;
+extern Uint16 RamfuncsLoadEnd;
+extern Uint16 RamfuncsLoadSize;
+uint16_t f_err = 0;
 //
 // Array of pointers to EPwm register structures:
 // *ePWM[0] is defined as dummy value not used in the example
@@ -290,16 +306,19 @@ volatile struct EPWM_REGS *ePWM[PWM_CH] =
 int main(void)
 {
         int i = 0;
-        Uint16 RamfuncsLoadSize;
+       // Uint16 RamfuncsLoadSize;
         int32 reset_flag = 0;
+        memcpy((uint16_t *)&RamfuncsRunStart,(uint16_t *)&RamfuncsLoadStart, (unsigned long)&RamfuncsLoadSize);
         InitSysCtrl();
         DINT;
+
         //
         // Initialize the PIE control registers to their default state.
         // The default state is all PIE interrupts disabled and flags
         // are cleared.
         // This function is found in the DSP2803x_PieCtrl.c file.
         //
+        InitFlash();
         InitPieCtrl();
         //
         // Disable CPU interrupts and clear all CPU interrupt flags:
@@ -314,6 +333,7 @@ int main(void)
         // The shell ISR routines are found in DSP2803x_DefaultIsr.c.
         // This function is found in DSP2803x_PieVect.c.
         //
+        //InitFlash();
         InitPieVectTable();
 
        // RamfuncsLoadSize = RamfuncsLoadStart - RamfuncsLoadEnd;
@@ -383,8 +403,73 @@ int main(void)
         wifi_init_flag = 1;
         CpuTimer1.RegsAddr->PRD.all = 29999;//CpuTimer1.RegsAddr->PRD.all = 599999;
         gen.F = f_base;//144200.0;//71600.0;
+        BlockHeader.DestAddr = PROG_ADDR;
+        BlockHeader.BlockSize = 8;
+        memcpy(readBuf, PROG_ADDR , sizeof(readBuf));
+        if((readBuf[0] != 0xFF) || (readBuf[1] != 0xFF))
+        {
+            memcpy((uint16_t *)(&f_base), (uint16_t *)(&readBuf[0]), 2);
+        }
+        if((readBuf[2] != 0xFFFF) || (readBuf[3] != 0xFFFF))
+        {
+            memcpy((uint16_t *)(&trx), (uint16_t *)(&readBuf[2]), 1);
+        }
+        if((readBuf[4] != 0xFFFF) || (readBuf[5] != 0xFFFF))
+        {
+            memcpy((uint16_t *)(&ttx), (uint16_t *)(&readBuf[4]), 2);
+        }
+        if((readBuf[6] != 0xFFFF) || (readBuf[7] != 0xFFFF))
+        {
+            memcpy((uint16_t *)(&(gen.pi_u.ki)), (uint16_t *)(&readBuf[6]), 2);
+        }
+        if((readBuf[8] != 0xFFFF) || (readBuf[9] != 0xFFFF))
+        {
+            memcpy((uint16_t *)(&(gen.pi_u.kp)), (uint16_t *)(&readBuf[8]), 2);
+        }
+        if((readBuf[10] != 0xFFFF) || (readBuf[11] != 0xFFFF))
+        {
+            memcpy((uint16_t *)(&(i_h)), (uint16_t *)(&readBuf[10]), 1);
+        }
+        if((readBuf[12] != 0xFFFF) || (readBuf[13] != 0xFFFF))
+        {
+           memcpy((uint16_t *)(&(i_l)), (uint16_t *)(&readBuf[12]), 1);
+        }
+        if((readBuf[14] != 0xFFFF) || (readBuf[15] != 0xFFFF))
+        {
+           memcpy((uint16_t *)(&(burst_l)), (uint16_t *)(&readBuf[14]), 1);
+        }
+        if((readBuf[16] != 0xFFFF) || (readBuf[17] != 0xFFFF))
+        {
+           memcpy((uint16_t *)(&(dD)), (uint16_t *)(&readBuf[16]), 2);
+        }
+        if((readBuf[18] != 0xFFFF) || (readBuf[19] != 0xFFFF))
+        {
+           memcpy((uint16_t *)(&(amp_fix)), (uint16_t *)(&readBuf[18]), 2);
+        }
+
+        if(f_base < 141000.0)
+        {
+           f_base = 141000.0;
+        }
+        if(trx > 100)
+        {
+           trx = 100;
+        }
+        if(trx > 100.0)
+        {
+           trx = 100.0;
+        }
+        if(gen.pi_u.ki < 0.01)
+        {
+            gen.pi_u.ki = 0.01;
+        }
+        if(gen.pi_u.ki < 0.1)
+        {
+           gen.pi_u.ki = 0.1;
+        }
         while(1)
         {
+            flash_processing();
             GpioDataRegs.GPATOGGLE.bit.GPIO4 |= 1;
             logs_processing(&gen);
             connection_manager();
@@ -586,7 +671,7 @@ __interrupt void cpu_timer1_isr(void)
                     state_maschine_pointer = 0;
                 }
                 */
-                if(vres_detector > 335)
+                if(vres_detector > 330)
                 {
                     ++OV_counter;
                 }
@@ -594,7 +679,7 @@ __interrupt void cpu_timer1_isr(void)
                 {
                     OV_counter = 0;
                 }
-                if((state_maschine_pointer == 0) || (OV_counter >= 10) || (vres_detector < 220))
+                if((state_maschine_pointer == 0) || (OV_counter >= 2) || (vres_detector < 220))
                 {
                     gen.F = f_base;//144200.0;
                     if(esp8266.station[1].status == TCP_CLIENT_IS_NOT_CONNECTED)
@@ -662,13 +747,13 @@ __interrupt void cpu_timer1_isr(void)
                 }
                 burst_duty = 0.01*(mqtt.duty);
                 gen.F = 1.0*(mqtt.freq) + 10000.0*mqtt.freq_h + 100000.0;
-                if(gen.F < 140000.0)
+                if(gen.F < 141000.0)
                 {
-                    gen.F = 140000.0;
+                    gen.F = 141000.0;
                 }
-                if(gen.F > 169999.0)
+                if(gen.F > 1459999.0)
                 {
-                    gen.F = 169999.0;
+                    gen.F = 149999.0;
                 }
                 f_base = gen.F;
                 i_h = (uint16_t)(mqtt.uh);
@@ -717,7 +802,14 @@ __interrupt void cpu_timer1_isr(void)
 
        ++cnt;
       // base = timer_arrays_update(gen.AMP, (4*gen.F), SINTOP1, SINBOT1);
-
+       if(gen.F < 141000.0)
+       {
+          gen.F = 141000.0;
+       }
+       if(gen.F > 1459999.0)
+       {
+          gen.F = 149999.0;
+       }
        base = timer_arrays_update(gen.AMP, (2*gen.F), SINTOP1, SINBOT1);
 
        base_led =  0x48;//(uint16_t)(base);//(uint16_t)(base * PERIOD_DIVIDER);
@@ -2933,7 +3025,7 @@ void mqtt_parser(char * data)
     const char *str_f = "{f=:";
     const char *str_d = "{d=:0.";
 
-   // const char *str_eeprom = "eeprom";
+    const char *str_eeprom = "eeprom";
     const char *str_k1 = "k1:=";
     const char *str_k2 = "k2:=";
     const char *str_ki = "ki:=";
@@ -3106,6 +3198,15 @@ void mqtt_parser(char * data)
                                                                                                                           }
                                                                                                                    }
                                                                                                                    break;
+        case 15:
+                                                                                                                           {
+                                                                                                                               if(stringSeeker(s1_p, str_eeprom, 55, 6, &kptr))
+                                                                                                                                  {
+                                                                                                                                         flash_tx = 1;
+                                                                                                                                         memset (data_rx_mqtt, 0, sizeof(data_rx_mqtt));
+                                                                                                                                  }
+                                                                                                                           }
+                                                                                                                           break;
         default: break;
     }
 
@@ -3469,4 +3570,43 @@ void resetLoops(GEN_STRUCT * d)
       d->pi_u.out = _IQ(0.0);
 
       d->u_out_loop_en = LOOP_DISABLE;
+}
+void flash_processing(void)
+{
+    FLASH_ST FlashStatus;
+    Uint16 f_status = 0;
+    //Uint16 progBuf[16] = {1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16};
+    if(flash_tx)
+    {
+        flash_tx = 0;
+        IER = 0x0000;
+        IFR = 0x0000;
+
+        CsmUnlock();
+
+        EALLOW;
+        Flash_CPUScaleFactor = SCALE_FACTOR;
+        Flash_CallbackPtr = NULL;
+        EDIS;
+        f_status = Flash_Erase(SECTORE, &FlashStatus);
+
+        memcpy(&progBuf[0], (uint16_t *)(&f_base), 2);
+        memcpy(&progBuf[2], (uint16_t *)(&trx), 1);
+        memcpy(&progBuf[4], (uint16_t *)(&ttx), 2);
+        memcpy(&progBuf[6], (uint16_t *)(&(gen.pi_u.ki)), 2);
+        memcpy(&progBuf[8], (uint16_t *)(&(gen.pi_u.kp)), 2);
+        memcpy(&progBuf[10], (uint16_t *)(&(i_h)), 1);
+        memcpy(&progBuf[12], (uint16_t *)(&(i_l)), 1);
+        memcpy(&progBuf[14], (uint16_t *)(&(burst_l)), 2);
+        memcpy(&progBuf[16], (uint16_t *)(&(dD)), 2);
+        memcpy(&progBuf[18], (uint16_t *)(&(amp_fix)), 2);
+
+        f_status = Flash_Program((Uint16 *) (PROG_ADDR), (Uint16 *)progBuf, 64, &FlashStatus);
+        while(f_status != STATUS_SUCCESS)
+        {
+            DELAY_US(1000);
+        }
+        EINT;   // Enable Global interrupt INTM
+        ERTM;
+    }
 }
