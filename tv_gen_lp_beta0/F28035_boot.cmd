@@ -134,14 +134,14 @@ SECTIONS
 #ifdef __TI_COMPILER_VERSION__
    #if __TI_COMPILER_VERSION__ >= 15009000
     .TI.ramfunc : {} LOAD = FLASHD,
-                         RUN = RAML0L1,//RAML0,
+                         RUN = RAML2,//RAML0,
                          LOAD_START(_RamfuncsLoadStart),
                          LOAD_SIZE(_RamfuncsLoadSize),
                          RUN_START(_RamfuncsRunStart),
                          PAGE = 0
    #else
    ramfuncs            : LOAD = FLASHD,
-                         RUN = RAML0L1,//RAML0,
+                         RUN = RAML2,//RAML0,
                          LOAD_START(_RamfuncsLoadStart),
                          LOAD_SIZE(_RamfuncsLoadSize),
                          RUN_START(_RamfuncsRunStart),
@@ -154,10 +154,10 @@ SECTIONS
 
    /* Allocate uninitalized data sections: */
    .stack              : > RAMM0       					PAGE = 1
-   .ebss               : > RAML0L1 | RAML2  			PAGE = 0
-   .esysmem            : > RAML0L1 | RAML2  			PAGE = 0
-   .data               : > RAML0L1 | RAML2				PAGE = 0
-   .cio                : > RAML0L1 | RAML2 		     	PAGE = 0
+   .ebss               : > RAML0L1//: > RAML0L1 | RAML2  			PAGE = 0
+   .esysmem            : > RAML0L1 | RAML2// : > RAML0L1 | RAML2  			PAGE = 0
+   .data               : > RAML0L1// : > RAML0L1 | RAML2				PAGE = 0
+   .cio                : > RAML0L1 | RAML2  // : > RAML0L1 | RAML2 		     	PAGE = 0
   //.cio                	: > RAMM1	     				PAGE = 	1
    /* Initalized sections go in Flash */
    /* For SDFlash to program these, they must be allocated to page 0 */

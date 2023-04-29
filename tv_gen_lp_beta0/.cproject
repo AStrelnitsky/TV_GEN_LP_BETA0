@@ -95,7 +95,7 @@
 						</toolChain>
 					</folderInfo>
 					<sourceEntries>
-						<entry excluding="F28035.cmd|F28035_boot_master.cmd|mqtt-protocol-c-master|docs|headers|common|common/source/DSP2803x_SWPrioritizedPieVect.c|common/source/DSP2803x_SWPrioritizedDefaultIsr.c|common/cmd|28035_RAM_lnk.cmd|F28035_CLA_C.cmd|CLA_GEN.asm" flags="VALUE_WORKSPACE_PATH|RESOLVED" kind="sourcePath" name=""/>
+						<entry excluding="Flash2802x_API_V201.lib|F28035.cmd|F28035_boot_master.cmd|mqtt-protocol-c-master|docs|headers|common|common/source/DSP2803x_SWPrioritizedPieVect.c|common/source/DSP2803x_SWPrioritizedDefaultIsr.c|common/cmd|28035_RAM_lnk.cmd|F28035_CLA_C.cmd|CLA_GEN.asm" flags="VALUE_WORKSPACE_PATH|RESOLVED" kind="sourcePath" name=""/>
 					</sourceEntries>
 				</configuration>
 			</storageModule>
