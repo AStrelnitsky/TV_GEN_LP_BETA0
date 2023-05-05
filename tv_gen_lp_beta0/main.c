@@ -287,7 +287,7 @@ uint16_t trx = 85;
 float ttx = 100.0;
 float dD = 12000.0;
 uint16_t OV_counter = 0;
-float burst_l = 0.039;
+float burst_l = 0.050;//0.039;
 uint16_t flash_tx = 0;
 HEADER BlockHeader;
 Uint16 progBuf[64] = {1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,17,16,19,20,21,22,23,24,25,26,27,28,29,30,31,32,33,34,35,36,37,38,39,40,41,42,43,44,45,46,47,48,49,50,51,52,53,54,55,56,57,58,59,60,61,62,63,64};
@@ -750,7 +750,7 @@ __interrupt void cpu_timer1_isr(void)
                 }
                 burst_duty = 0.01*(mqtt.duty);
                 gen.F = 1.0*(mqtt.freq) + 10000.0*mqtt.freq_h + 100000.0;
-                if(gen.F < 141000.0)
+                if(gen.F < 141000.0) // was 141000.0
                 {
                     gen.F = 141000.0;
                 }
@@ -1212,7 +1212,7 @@ void gen_initial_conditions(void)
     gen.pi_u.kp = _IQ(0.2);
     gen.pi_u.out = _IQ(0.0);
 
-    f_base = 145000.0;//143200.0;
+    f_base = 143200.0;//145000.0;//143200.0;
     i_h = 10;
     i_l = 0;
     mqtt.duty = 0;//
@@ -1220,9 +1220,9 @@ void gen_initial_conditions(void)
     mqtt.kp_u = 0.95;
     mqtt.ki_u = 0.1;
     mqtt.dD = 12;
-    mqtt.k3 = 0.039;
+    mqtt.k3 = 0.050;//0.039;
     mqtt.af = 1.0;
-    mqtt.freq = 5000.0;//3200.0;//3200.0;
+    mqtt.freq = 3200.0;//5000.0;//3200.0;//3200.0;
     mqtt.freq_h = 4.0;
     resetLoops(&gen);
 }
