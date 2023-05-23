@@ -376,7 +376,7 @@ int main(void)
         PieCtrlRegs.PIEIER11.bit.INTx7 = 1;
         GpioCtrlRegs.GPAMUX1.bit.GPIO4 = 0;
        // while (read_id_wait < 210)
-        reprom.id[0] = '~';//reprom.id[0];
+        reprom.id[0] = '*';//'~';//reprom.id[0];
         reprom.id[1] = '>';//reprom.id[1];
         reprom.id[2] = '0';//reprom.id[2];
         reprom.id[3] = '0';//reprom.id[3];
@@ -438,7 +438,7 @@ int main(void)
         }
         if((readBuf[14] != 0xFFFF) || (readBuf[15] != 0xFFFF))
         {
-           memcpy((uint16_t *)(&(burst_l)), (uint16_t *)(&readBuf[14]), 1);
+           memcpy((uint16_t *)(&(burst_l)), (uint16_t *)(&readBuf[14]), 2);
         }
         if((readBuf[16] != 0xFFFF) || (readBuf[17] != 0xFFFF))
         {
@@ -754,13 +754,13 @@ __interrupt void cpu_timer1_isr(void)
                 {
                     gen.F = 141000.0;
                 }
-                //if(gen.F > 1459999.0)
+                //if(gen.F > 1469999.0)
                 //{
-                //    gen.F = 1459999.0;
+                //    gen.F = 1469999.0;
                 //}
-                if(gen.F > 1469999.0)
+                if(gen.F > 1529999.0)
                 {
-                   gen.F = 1469999.0;
+                   gen.F = 1529999.0;
                 }
                 f_base = gen.F;
                 i_h = (uint16_t)(mqtt.uh);
@@ -2476,7 +2476,7 @@ uint16_t connection_manager(void)
                     remote_data[6]  = (uint16_t)(data_rx[6] + 9);///(uint16_t)volts[ADC_IHB_LS];
                     remote_data[7]  = (uint16_t)data_rx[7];
                     remote_data[8]  = (uint16_t)(volts[ADC_TEXT]);
-                    remote_data[9]  = (uint16_t)((gen.F - 140000.0) / 10.0);
+                    remote_data[9]  = (uint16_t)((uint32_t)(gen.F) % 1000);//(uint16_t)((gen.F - 140000.0) % 1000.0);
 
                     remote_data[10] = trx;//(uint16_t)(burst_duty*100.0);
                     remote_data[11] = (uint16_t)ttx;//;
@@ -2487,7 +2487,7 @@ uint16_t connection_manager(void)
                     remote_data[16]  = (uint16_t)(burst_l*1000.0);//
                     remote_data[17]  = (uint16_t)(dD / 1000.0);//
                     remote_data[18]  = (uint16_t)(amp_fix*100.0);//
-                    remote_data[19]  = state_maschine_pointer;//
+                    remote_data[19]  = (uint16_t)((uint32_t)(gen.F) / 1000);//state_maschine_pointer;//
 
                     remote_data[20] = (uint16_t)data_rx[8];//(uint16_t)(burst_duty*100.0);
                     remote_data[21] = (uint16_t)data_rx[9];
