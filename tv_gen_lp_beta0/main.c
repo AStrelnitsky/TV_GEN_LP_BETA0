@@ -378,7 +378,7 @@ int main(void)
        // while (read_id_wait < 210)
         reprom.id[0] = '*';//'~';//reprom.id[0];
         reprom.id[1] = '>';//reprom.id[1];
-        reprom.id[2] = '0';//reprom.id[2];
+        reprom.id[2] = '5';//reprom.id[2];
         reprom.id[3] = '0';//reprom.id[3];
         reprom.id[4] = '0';//reprom.id[4];
         reprom.id[5] = '0';//reprom.id[5];
@@ -2330,9 +2330,9 @@ void atCommandManager(uint16_t command)
         {
                atCommand_tx.len = AT_CWSAP_CUR(LEN);
                memcpy(&(atCommand_tx.str[0]), AT_CWSAP_CUR(STR), atCommand_tx.len);
-               atCommand_tx.str[34] = '~';//reprom.id[0];
+               atCommand_tx.str[34] = '*';//reprom.id[0];
                atCommand_tx.str[35] = '>';//reprom.id[1];
-               atCommand_tx.str[36] = '0';//reprom.id[2];
+               atCommand_tx.str[36] = '4';//reprom.id[2];
                atCommand_tx.str[37] = '0';//reprom.id[3];
                atCommand_tx.str[38] = '0';//reprom.id[4];
                atCommand_tx.str[39] = '0';//reprom.id[5];
@@ -2476,7 +2476,7 @@ uint16_t connection_manager(void)
                     remote_data[6]  = (uint16_t)(data_rx[6] + 9);///(uint16_t)volts[ADC_IHB_LS];
                     remote_data[7]  = (uint16_t)data_rx[7];
                     remote_data[8]  = (uint16_t)(volts[ADC_TEXT]);
-                    remote_data[9]  = (uint16_t)((uint32_t)(gen.F) % 1000);//(uint16_t)((gen.F - 140000.0) % 1000.0);
+                    remote_data[9]  = (uint16_t)volts[ADC_PFC_TEMP];//(uint16_t)((uint32_t)(gen.F) % 1000);//(uint16_t)((gen.F - 140000.0) % 1000.0);
 
                     remote_data[10] = trx;//(uint16_t)(burst_duty*100.0);
                     remote_data[11] = (uint16_t)ttx;//;
