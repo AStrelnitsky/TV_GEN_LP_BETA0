@@ -41,7 +41,7 @@
 #define AT_CWMODE_AP_STA(x)                                         (x == 0 ? 18 : ((x) == 1 ? "AT+CWMODE_CUR=3\r\n" : 17))
 #define AT_CWSAP_TERMINAL(x)                                        (x == 0 ? 19 : ((x) == 1 ? "AT+CWSAP=\"ReasonanceKickChargeTerminal\",\"100@101@\",11,3\r\n" : 57))// (x == 0 ? 19 : ((x) == 1 ? "AT+CWSAP=\"ReasonanceKickChargeTerminal\",\"100@101@\",5,3\r\n" : 56))
 //#define AT_CWJAP_TERMINAL(x)                                        (x == 0 ? 20 : ((x) == 1 ? "AT+CWJAP=\"ReasonanceHub\",\"100@101@\"\r\n" : 37))//(x == 0 ? 20 : ((x) == 1 ? "AT+CWJAP=\"ReasonanceUpdateFirmware_11.1\",\"100@101@\"\r\n" : 53))//(x == 0 ? 20 : ((x) == 1 ? "AT+CWJAP=\"ReasonanceKickChargeTerminal\",\"100@101@\"\r\n" : 52))
-#define AT_CWJAP_TERMINAL(x)                                        (x == 0 ? 20 : ((x) == 1 ? "AT+CWJAP=\"ReasonanceHut\",\"100@101@\"\r\n" : 37))
+#define AT_CWJAP_TERMINAL(x)                                        (x == 0 ? 20 : ((x) == 1 ? "AT+CWJAP=\"SoiLAB\",\"makers@123\"\r\n" : 32))//(x == 0 ? 20 : ((x) == 1 ? "AT+CWJAP=\"ReasonanceHut\",\"100@101@\"\r\n" : 37))
 #define AT_CIPSTART_TCP_TERMINAL(x)                                 (x == 0 ? 21 : ((x) == 1 ? "AT+CIPSTART=\"TCP\",\"192.168.4.2\",8,7200\r\n" : 40))
 #define AT_CIPSEND_STA_ID1(x)                                       (x == 0 ? 22 : ((x) == 1 ? "AT+CIPSEND=1,64\r\n" : 17 ))
 #define AT_CIPSTART_MMQT(x)                                         (x == 0 ? 23 : ((x) == 1 ? "AT+CIPSTART=0,\"TCP\",\"driver.cloudmqtt.com\",18793\r\n" : 50))//(x == 0 ? 23 : ((x) == 1 ? "AT+CIPSTART=0,\"TCP\",\"driver.cloudmqtt.com\",18737\r\n" : 50))//(x == 0 ? 23 : ((x) == 1 ? "AT+CIPSTART=\"TCP\",\"driver.cloudmqtt.com\",18737\r\n" : 48))

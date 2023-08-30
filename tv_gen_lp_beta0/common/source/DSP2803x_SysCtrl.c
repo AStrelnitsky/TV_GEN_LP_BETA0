@@ -190,7 +190,12 @@ DisableDog(void)
     SysCtrlRegs.WDCR= 0x0068;
     EDIS;
 }
-
+void EnableDog(void)
+{
+    EALLOW;
+    SysCtrlRegs.WDCR = 0x002F;
+    EDIS;
+}
 //
 // InitPll - This function initializes the PLLCR register.
 //

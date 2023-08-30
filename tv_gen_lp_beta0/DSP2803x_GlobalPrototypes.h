@@ -152,6 +152,7 @@ extern void DSP28x_usDelay(Uint32 Count);
 
 extern void ServiceDog(void);
 extern void DisableDog(void);
+extern void EnableDog(void);
 extern Uint16 CsmUnlock(void);
 extern void IntOsc1Sel (void);
 extern void IntOsc2Sel (void);

@@ -47,6 +47,7 @@
 #define PERIOD_MULTIPLIER_TIM 32
 #define BURST_FREQ 100
 #define PROG_ADDR 0x3EE000
+#define STATUS_Q 10
 
 #pragma DATA_SECTION(fCoeffs,"Cla1ToCpuMsgRAM");
 float fCoeffs[FILTER_LEN];//{0.0212, 0.00212, 0.00213, 0.00212, 0.0212};// {0.0625, 0.25, 0.375, 0.25, 0.0625};//{0.0625, 0.25, 0.375, 0.25, 0.0625};
@@ -76,6 +77,7 @@ uint16_t mqtt_shift[16];
 uint16_t mqtt_shift_counter = 0;
 int cpu_temp = 0;//_IQ(0.0);
 uint16_t vres_detector = 0;
+uint16_t idc_rect = 0;
 //uint16_t rect_temp = 0;
 //int bridge_temp = 0;
 //
@@ -378,7 +380,7 @@ int main(void)
        // while (read_id_wait < 210)
         reprom.id[0] = '*';//'~';//reprom.id[0];
         reprom.id[1] = '>';//reprom.id[1];
-        reprom.id[2] = '5';//reprom.id[2];
+        reprom.id[2] = '4';//reprom.id[2];
         reprom.id[3] = '0';//reprom.id[3];
         reprom.id[4] = '0';//reprom.id[4];
         reprom.id[5] = '0';//reprom.id[5];
@@ -472,6 +474,7 @@ int main(void)
         flash_tx = 0;
         while(1)
         {
+            EnableDog();
             GpioDataRegs.GPATOGGLE.bit.GPIO4 |= 1;
             logs_processing(&gen);
             connection_manager();
@@ -626,6 +629,7 @@ void init_CPUT_timer(void)
 __interrupt void cpu_timer1_isr(void)
 {
     _iq d_b = _IQ(0.0);
+    ServiceDog();
     vres_detector = data_rx[4] + (((uint16_t)data_rx[5]) << 8);
     if(tim_counter < 256)
     {
@@ -2491,7 +2495,7 @@ uint16_t connection_manager(void)
 
                     remote_data[20] = (uint16_t)data_rx[8];//(uint16_t)(burst_duty*100.0);
                     remote_data[21] = (uint16_t)data_rx[9];
-                    remote_data[22] = 0;
+                    remote_data[22] = idc_rect;//(uint16_t)data_rx[5];
                     remote_data[23] = 0;
                     remote_data[24] = 0;
                     remote_data[25] = 0;
@@ -2773,11 +2777,12 @@ void mqtt_manager(void)
                                s1 = "ALREADY";
                                init = waitATReceive_nonbloking_service(s, 9, 2*WIFI_TIMER_OVERFLOW);
                               // init1 = waitATReceive_nonbloking_service(s1, 7, 2*WIFI_TIMER_OVERFLOW);
-                               //if((init == 2) || (init1 == 2))
-                               if((init == 2) || (data_rx_service[0] == 'A'))
+                               if((init == 2) || (init1 == 2) || (data_rx_service[0] == 'A'))
+                              // if((init == 2) || (data_rx_service[0] == 'A'))
                                {
                                    data_rx_service[0] = 0;
                                    mqtt.state_machine = MQTT_CONNECT_TO_SERVER_OK;
+                                  // mqtt.lost_connection_timer = 0; //NEW_FOR_TEST
                                }
                                else if(init == 3)
                                {
@@ -2977,6 +2982,9 @@ void mqtt_manager(void)
                 break;
                 case MMQT_READY_TO_STATUS:
                 {
+                    if(esp8266.status_counter >= STATUS_Q)
+                    {
+                        esp8266.status_counter = 0;
                        if(esp8266.station[1].status == TCP_CLIENT_IS_DISCONNECTED)
                        {
                           atCommand_tx.tx_flag = 1;
@@ -2987,6 +2995,11 @@ void mqtt_manager(void)
                        {
                            mqtt.state_machine = MMQT_SUBSCRIBE_OK;
                        }
+                    }
+                    else
+                    {
+                        ++(esp8266.status_counter);
+                    }
                 }
                 break;
                 case MMQT_READY_TO_CLOSE_DEVICE:
@@ -3289,6 +3302,7 @@ uint16_t IPD_parser(const char * str)
             esp8266.station[1].status = TCP_CLIENT_IS_CONNECTED;
             esp8266.station[1].lost_connection = 0;
             memcpy(&data_rx[0], &esp8266.AT_rx_buff[n + 2], 32);
+            idc_rect = data_rx[5];
         }
     return n;
 }

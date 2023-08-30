@@ -22,7 +22,7 @@
 
 #define RECT_KICKSCOOTER_BASE_NAME "REASONANCE_RECT_0250.0"
 #define TERMINAL_BASE_NAME "REASONANCE_RECT_0250.0"
-#define LOST_CONNECTION_TIMEOUT 50//10
+#define LOST_CONNECTION_TIMEOUT 400//10
 #define DEVICE_LOST_TIMEOUT 2000
 
 typedef enum
@@ -437,6 +437,7 @@ typedef struct
     TCP_CLIENT station[2];
     TCP_CLIENT terminal;
     TCP_CLIENT device;
+    uint16_t status_counter;
 }ESP8266;
 inline uint16_t timer_arrays_update(float amp, float freq, uint16_t * top, uint16_t * bottom)
 {
