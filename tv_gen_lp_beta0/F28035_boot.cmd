@@ -157,7 +157,7 @@ SECTIONS
    .ebss               : > RAML0L1//: > RAML0L1 | RAML2  			PAGE = 0
    .esysmem            : > RAML0L1 | RAML2// : > RAML0L1 | RAML2  			PAGE = 0
    .data               : > RAML0L1// : > RAML0L1 | RAML2				PAGE = 0
-   .cio                : > RAML0L1 | RAML2  // : > RAML0L1 | RAML2 		     	PAGE = 0
+   .cio                : > RAML0L1 | RAML2 | RAML3  // : > RAML0L1 | RAML2 		     	PAGE = 0
   //.cio                	: > RAMM1	     				PAGE = 	1
    /* Initalized sections go in Flash */
    /* For SDFlash to program these, they must be allocated to page 0 */

@@ -357,7 +357,7 @@ int main(void)
         EINT;   // Enable Global interrupt INTM
         ERTM;
 
-       //initWiFi_station();
+       initWiFi_station();
 
         gen_initial_conditions();
 
@@ -401,7 +401,7 @@ int main(void)
         PieCtrlRegs.PIEIER9.bit.INTx1 = 1;
 
         GpioDataRegs.GPACLEAR.bit.GPIO2 = 1;
-        initWiFi_station();
+      ///  initWiFi_station();
 
         wifi_init_flag = 1;
         CpuTimer1.RegsAddr->PRD.all = 29999;//CpuTimer1.RegsAddr->PRD.all = 599999;
@@ -1749,12 +1749,20 @@ void initWiFi_station(void)
     uint16_t init_hack = 1;
     const char *s_at;
     const char *s_at_1;
+
     long wifi_timer = 0;
    // while(init == 1)
    // {
    //     init = waitATReceive(s_at,5,10*WIFI_TIMER_OVERFLOW);
    // }
     wifi_init();
+
+    atCommand_tx.tx_flag = 1; //FOR TEST
+    esp8266.c_status = ESP8266_IDLE;
+    atCommandManager((int)AT_RESTORE(NUM));  //FOR TEST
+    s_at = "RESTORE";
+    waitATReceive(s_at,7,10*WIFI_INIT_TIMER_OVERFLOW);
+
     esp8266Reset();
     while(init)
     {
@@ -1913,13 +1921,14 @@ void initWiFi_station(void)
                 {
                                 s_at = "CONNECTED";
                                 //s_at_1 = "CONECTED";
-                                s_at_1 = "OK";
+                                //s_at_1 = "OK";
+                                s_at_1 = "GOT";
                                 ///TRY TO CONNECT TO TERMIAL
                                 atCommand_tx.tx_flag = 1;
                                 esp8266.c_status = ESP8266_CWJAP_TERMINAL_TX;
                                 atCommandManager((int)AT_CWJAP_TERMINAL(NUM));
 
-                                init_hack = waitATReceive(s_at_1, 2, 50*WIFI_INIT_TIMER_OVERFLOW);
+                                init_hack = waitATReceive(s_at_1, 3, 50*WIFI_INIT_TIMER_OVERFLOW);
                                 init = waitATReceive(s_at, 9, 50*WIFI_INIT_TIMER_OVERFLOW);
                                 if((init == 2) || (init_hack == 2))
                                 {
@@ -1931,6 +1940,8 @@ void initWiFi_station(void)
                                 else
                                 {
                                     esp8266.c_status = ESP8266_IDLE;
+                                   // atCommand_tx.console = 1;
+                                  //  debug_console();
                                    // wifi_timer = 0;
                                 }
                  }
@@ -2084,7 +2095,7 @@ const char *s_at_ad = "/r/n";
 uint16_t ap = 1;
     uint16_t len;
     const char *s1;
-    const char *s_1310 = "\r\n";
+    const char *s_1310 = ";;";
     uint16_t n = 0;
     /*
     while(ap)
@@ -2103,22 +2114,26 @@ uint16_t ap = 1;
         }
     }
     */
-    if(atCommand_tx.console)
+    while(ap)// if(atCommand_tx.console)
     {
-            //waitATReceive(s_at_ad,2, 50*WIFI_TIMER_OVERFLOW);
-          //  printf("last received message:\r\n");
-           // printf( "%s", esp8266.AT_rx_buff);
-          //  fgets(atCommand_tx.str, 32, stdin);
+           ap = atCommand_tx.console;
+            waitATReceive(s_at_ad,2, 50*WIFI_TIMER_OVERFLOW);
+            printf("last received message:\r\n");
+            printf( "%s", esp8266.AT_rx_buff);
+
+            memset(&(atCommand_tx.str[0]), 0, sizeof(atCommand_tx.str));
+
+            fgets(atCommand_tx.str, 36, stdin);
 
             s1 = (char*) (&(atCommand_tx.str[0]));
             if(mqtt_test_flag == 0)
             {
-                if(stringSeeker(s1,s_1310,32,2, &n))
+                if(stringSeeker(s1,s_1310,36,2, &n))
                 {
-                    if(atCommand_tx.tx_flag)
+                  //  if(atCommand_tx.tx_flag)
                     {
-                        //atCommand_tx.str[n] = 13;
-                        //atCommand_tx.str[n + 1] = 10;
+                        atCommand_tx.str[n] = 13;
+                        atCommand_tx.str[n + 1] = 10;
                         len  = n + 2;
                         atCommand_tx.len = len;
                         atCommand_tx.tx_flag = 0;
@@ -2434,6 +2449,11 @@ void atCommandManager(uint16_t command)
             memcpy(&(atCommand_tx.str[0]), AT_CIPSTART_UDP(STR), atCommand_tx.len);
         }
         break;
+        case ((int)AT_RESTORE(NUM)):
+        {
+            atCommand_tx.len = AT_RESTORE(LEN);
+            memcpy(&(atCommand_tx.str[0]), AT_RESTORE(STR), atCommand_tx.len);
+        }
         default : break;
     }
     if(atCommand_tx.tx_flag)
@@ -2944,6 +2964,10 @@ void mqtt_manager(void)
                     memcpy(&(atCommand_tx.str[0]), mqtt_publish_common, mqtt.p_len);
                     atCommand_tx.tx_flag = 1;
                     atCommand_tx.len = mqtt.p_len;
+                    if(atCommand_tx.str[atCommand_tx.len - 1] != '}')
+                    {
+                        atCommand_tx.str[atCommand_tx.len - 1] = '}';
+                    }
                     mqtt.state_machine = MMQT_DATA_SEND_TX;
                     atCommandSend(&(atCommand_tx.str[0]), atCommand_tx.len);
                 }

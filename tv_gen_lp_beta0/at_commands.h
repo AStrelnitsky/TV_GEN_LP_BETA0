@@ -53,4 +53,5 @@
 #define AT_UART_CONFIG(x)                                           (x == 0 ? 29 : ((x) == 1 ? "AT+UART_CUR=2500000,8,1,0,0\r\n" : 29 ))//(x == 0 ? 29 : ((x) == 1 ? "AT+UART_CUR=2304000,8,1,0,0\r\n" : 29 ))
 #define AT_CIPSEND_STA_ID0_MQTT_SUBSCRIPTION(x)                     (x == 0 ? 30 : ((x) == 1 ? "AT+CIPSEND=0,37\r\n" : 17 ))//(x == 0 ? 30 : ((x) == 1 ? "AT+CIPSEND=0,18\r\n" : 17 ))
 #define AT_CIPCLOSE(x)                                              (x == 0 ? 31 : ((x) == 1 ? "AT+CIPCLOSE=1\r\n" : 15 ))
+#define AT_RESTORE(x)                                               (x == 0 ? 32 : ((x) == 1 ? "AT+RESTORE\r\n" : 12 ))
 #endif /* F2802X_COMMON_INCLUDE_AT_COMMANDS_H_ */
