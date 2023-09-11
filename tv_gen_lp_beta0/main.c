@@ -299,6 +299,8 @@ extern Uint16 RamfuncsLoadStart;
 extern Uint16 RamfuncsLoadEnd;
 extern Uint16 RamfuncsLoadSize;
 uint16_t f_err = 0;
+char ssid_s_c[36];
+char pass_s_c[16];
 //
 // Array of pointers to EPwm register structures:
 // *ePWM[0] is defined as dummy value not used in the example
@@ -312,6 +314,8 @@ int main(void)
        // Uint16 RamfuncsLoadSize;
         int32 reset_flag = 0;
         memcpy((uint16_t *)&RamfuncsRunStart,(uint16_t *)&RamfuncsLoadStart, (unsigned long)&RamfuncsLoadSize); //FOR TEST
+        memcpy(&(ssid_s_c[0]), (uint16_t *) (0x3F2000), 36);
+        memcpy(&(pass_s_c[0]), (uint16_t *) (0x3F2024), 16);
         InitSysCtrl();
         DINT;
 
@@ -380,7 +384,7 @@ int main(void)
        // while (read_id_wait < 210)
         reprom.id[0] = '*';//'~';//reprom.id[0];
         reprom.id[1] = '>';//reprom.id[1];
-        reprom.id[2] = '4';//reprom.id[2];
+        reprom.id[2] = '5';//reprom.id[2];
         reprom.id[3] = '0';//reprom.id[3];
         reprom.id[4] = '0';//reprom.id[4];
         reprom.id[5] = '0';//reprom.id[5];
@@ -1757,11 +1761,13 @@ void initWiFi_station(void)
    // }
     wifi_init();
 
+    esp8266Reset();
+
     atCommand_tx.tx_flag = 1; //FOR TEST
     esp8266.c_status = ESP8266_IDLE;
     atCommandManager((int)AT_RESTORE(NUM));  //FOR TEST
     s_at = "RESTORE";
-    waitATReceive(s_at,7,10*WIFI_INIT_TIMER_OVERFLOW);
+    waitATReceive(s_at,7,50*WIFI_INIT_TIMER_OVERFLOW);
 
     esp8266Reset();
     while(init)
@@ -2351,7 +2357,7 @@ void atCommandManager(uint16_t command)
                memcpy(&(atCommand_tx.str[0]), AT_CWSAP_CUR(STR), atCommand_tx.len);
                atCommand_tx.str[34] = '*';//reprom.id[0];
                atCommand_tx.str[35] = '>';//reprom.id[1];
-               atCommand_tx.str[36] = '4';//reprom.id[2];
+               atCommand_tx.str[36] = '5';//reprom.id[2];
                atCommand_tx.str[37] = '0';//reprom.id[3];
                atCommand_tx.str[38] = '0';//reprom.id[4];
                atCommand_tx.str[39] = '0';//reprom.id[5];
