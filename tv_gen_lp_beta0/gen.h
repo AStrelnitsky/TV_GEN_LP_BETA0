@@ -65,6 +65,7 @@ typedef struct
     uint32_t  lost_connection_timer;
     float kp_u, ki_u, af, pi_limit_hi, pi_limit_low;
     uint16_t dD;
+    uint16_t send_counter;
 }MQTT_CLIENT;
 typedef struct
 {
@@ -438,6 +439,16 @@ typedef struct
     TCP_CLIENT terminal;
     TCP_CLIENT device;
     uint16_t status_counter;
+    char ssid_s_data[36];
+    uint16_t ssid_s_len;
+    char pass_s_data[16];
+    uint16_t pass_s_len;
+
+   // char ssid_m_data[36];
+    uint16_t ssid_m_len;
+    //char pass_m_data[16];
+    uint16_t pass_m_len;
+
 }ESP8266;
 inline uint16_t timer_arrays_update(float amp, float freq, uint16_t * top, uint16_t * bottom)
 {

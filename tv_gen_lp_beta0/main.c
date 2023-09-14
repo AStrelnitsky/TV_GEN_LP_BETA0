@@ -141,6 +141,7 @@ void debug_console(void);
 void atCommandSend(char * str, uint16_t len);
 uint16_t stringSeeker(const char * str_src, const char * str_tg, uint16_t len_1, uint16_t len_2, uint16_t * num);
 uint16_t waitATReceive(const char * at, uint16_t len, uint16_t timeout);
+uint16_t check_stored_data(char * str);
 void logs_processing(GEN_STRUCT * obj);
 void atCommandManager(uint16_t command);
 void mqtt_message_constructor(uint16_t * msg, uint16_t * raw, uint16_t raw_len, MQTT_VAR * var );
@@ -299,8 +300,11 @@ extern Uint16 RamfuncsLoadStart;
 extern Uint16 RamfuncsLoadEnd;
 extern Uint16 RamfuncsLoadSize;
 uint16_t f_err = 0;
-char ssid_s_c[36];
-char pass_s_c[16];
+
+char cwjap_mem[60];
+uint16_t cwjap_len = 16;
+//char cwsap_mem[60];
+//uint16_t cwsap_len = 16;
 //
 // Array of pointers to EPwm register structures:
 // *ePWM[0] is defined as dummy value not used in the example
@@ -310,12 +314,36 @@ volatile struct EPWM_REGS *ePWM[PWM_CH] =
 //char recbuff[SCI_RX_SIZE];
 int main(void)
 {
+        char ssid_s_c[36];
+        char pass_s_c[16];
+
+
         int i = 0;
        // Uint16 RamfuncsLoadSize;
         int32 reset_flag = 0;
         memcpy((uint16_t *)&RamfuncsRunStart,(uint16_t *)&RamfuncsLoadStart, (unsigned long)&RamfuncsLoadSize); //FOR TEST
-        memcpy(&(ssid_s_c[0]), (uint16_t *) (0x3F2000), 36);
-        memcpy(&(pass_s_c[0]), (uint16_t *) (0x3F2024), 16);
+        memcpy(&(ssid_s_c[0]), (uint16_t *) (0x3F20D0), 36);
+        memcpy(&(pass_s_c[0]), (uint16_t *) (0x3F20F4), 16);
+
+
+        esp8266.ssid_s_len = check_stored_data(ssid_s_c);
+        memcpy(&(esp8266.ssid_s_data[0]), &(ssid_s_c[0]), esp8266.ssid_s_len);
+        esp8266.pass_s_len = check_stored_data(pass_s_c);
+        memcpy(&(esp8266.pass_s_data[0]), &(pass_s_c[0]), esp8266.pass_s_len);
+
+        memcpy(&cwjap_mem[0], AT_CWJAP_TERMINAL(STR), AT_CWJAP_TERMINAL(LEN));
+        memcpy(&cwjap_mem[10], &(esp8266.ssid_s_data[0]),  esp8266.ssid_s_len);
+        cwjap_mem[esp8266.ssid_s_len + 10] = '"';
+        cwjap_mem[esp8266.ssid_s_len + 11] = ',';
+        cwjap_mem[esp8266.ssid_s_len + 12] = '"';
+        memcpy(&cwjap_mem[13 + esp8266.ssid_s_len], &(esp8266.pass_s_data[0]),  esp8266.pass_s_len);
+        cwjap_mem[13 + esp8266.ssid_s_len + esp8266.pass_s_len] = '"';
+
+        cwjap_mem[14 + esp8266.ssid_s_len + esp8266.pass_s_len] = '\r';
+        cwjap_mem[15 + esp8266.ssid_s_len + esp8266.pass_s_len] = '\n';
+
+        cwjap_len = 16 + esp8266.ssid_s_len + esp8266.pass_s_len;
+
         InitSysCtrl();
         DINT;
 
@@ -382,12 +410,13 @@ int main(void)
         PieCtrlRegs.PIEIER11.bit.INTx7 = 1;
         GpioCtrlRegs.GPAMUX1.bit.GPIO4 = 0;
        // while (read_id_wait < 210)
-        reprom.id[0] = '*';//'~';//reprom.id[0];
-        reprom.id[1] = '>';//reprom.id[1];
-        reprom.id[2] = '5';//reprom.id[2];
-        reprom.id[3] = '0';//reprom.id[3];
-        reprom.id[4] = '0';//reprom.id[4];
-        reprom.id[5] = '0';//reprom.id[5];
+        memcpy(&(reprom.id[0]), (uint16_t *) (0x3F20B8), 7);
+        //reprom.id[0] = '*';//'~';//reprom.id[0];
+       // reprom.id[1] = '>';//reprom.id[1];
+      //  reprom.id[2] = '5';//reprom.id[2];
+      //  reprom.id[3] = '0';//reprom.id[3];
+      //  reprom.id[4] = '0';//reprom.id[4];
+      //  reprom.id[5] = '0';//reprom.id[5];
 
       //  while (id_state < 7)
      //   {
@@ -2299,6 +2328,17 @@ void logs_processing(GEN_STRUCT * obj)
 }
 void atCommandManager(uint16_t command)
 {
+    char ssid_m_c[36];
+    char pass_m_c[16];
+
+    memcpy(&(ssid_m_c[0]), (uint16_t *) (0x3F2000), 36);
+    memcpy(&(pass_m_c[0]), (uint16_t *) (0x3F2024), 16);
+
+    esp8266.ssid_m_len = check_stored_data(ssid_m_c);
+    memcpy(&(ssid_m_c[0]), &(ssid_m_c[0]), esp8266.ssid_m_len);
+    esp8266.pass_m_len = check_stored_data(pass_m_c);
+    memcpy(&(pass_m_c[0]), &(pass_m_c[0]), esp8266.pass_m_len);
+
     switch(command)
     {
         case ((int) AT_CIPSTART_TCP(NUM)):
@@ -2361,6 +2401,16 @@ void atCommandManager(uint16_t command)
                atCommand_tx.str[37] = '0';//reprom.id[3];
                atCommand_tx.str[38] = '0';//reprom.id[4];
                atCommand_tx.str[39] = '0';//reprom.id[5];
+
+               if(esp8266.ssid_m_len == 31)
+               {
+                   memcpy(&(atCommand_tx.str[10]), &(ssid_m_c[0]) ,31);
+               }
+               if(esp8266.pass_m_len == 8)
+               {
+                   memcpy(&(atCommand_tx.str[44]), &(pass_m_c) ,8);
+               }
+
         }
         break;
         case ((int) AT_CIPSTATUS(NUM)):
@@ -2391,8 +2441,16 @@ void atCommandManager(uint16_t command)
         break;
         case ((int) AT_CWJAP_TERMINAL(NUM)):
         {
+            if(cwjap_len <= 16)
+            {
                 atCommand_tx.len = AT_CWJAP_TERMINAL(LEN);
                 memcpy(&(atCommand_tx.str[0]), AT_CWJAP_TERMINAL(STR), atCommand_tx.len);
+            }
+            else
+            {
+                atCommand_tx.len = cwjap_len;
+                memcpy(&(atCommand_tx.str[0]), cwjap_mem, atCommand_tx.len);
+            }
         }
         break;
         case ((int) AT_CIPSTART_TCP_TERMINAL(NUM)):
@@ -2927,7 +2985,9 @@ void mqtt_manager(void)
                 case MMQT_SUBSCRIBE_OK:
                 {
                     //gen.leds_duty[0] = 0.2;
-
+                    if(mqtt.send_counter >= 10 )
+                    {
+                        mqtt.send_counter = 0;
                         s = ">";
                         init = waitATReceive_nonbloking_service(s,1, WIFI_TIMER_OVERFLOW);
                         if(init == 2)
@@ -2945,6 +3005,11 @@ void mqtt_manager(void)
                   //  atCommand_tx.tx_flag = 1;
                    // atCommandManager((int)AT_CIPSEND_STA_ID0_MQTT_DATA(NUM));
                    // mqtt.state_machine = MMQT_PREPARE_DATA_SEND_TX;
+                    }
+                    else
+                    {
+                        ++(mqtt.send_counter);
+                    }
 
                 }
                 break;
@@ -3661,4 +3726,13 @@ void flash_processing(void)
         EINT;   // Enable Global interrupt INTM
         ERTM;
     }
+}
+uint16_t check_stored_data(char * str)
+{
+    const char * s_str;
+    const char * sep = ";";
+    uint16_t n = 0;
+    s_str = str;
+    stringSeeker(s_str,sep,36,1, &n);
+    return n;
 }
