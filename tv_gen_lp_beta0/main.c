@@ -303,6 +303,7 @@ uint16_t f_err = 0;
 
 char cwjap_mem[60];
 uint16_t cwjap_len = 16;
+uint16_t cwjap_counter = 0;
 //char cwsap_mem[60];
 //uint16_t cwsap_len = 16;
 //
@@ -1974,7 +1975,19 @@ void initWiFi_station(void)
                                 }
                                 else
                                 {
-                                    esp8266.c_status = ESP8266_IDLE;
+                                    if(cwjap_counter < 2)
+                                    {
+                                        esp8266.c_status = ESP8266_IDLE;
+                                        ++cwjap_counter;
+                                    }
+                                    else
+                                    {
+                                        cwjap_counter = 0;
+                                        esp8266.c_status = ESP8266_CWJAP_TERMINAL_OK;
+                                        EPwm4Regs.TBPRD = (base * PERIOD_MULTIPLIER_TIM);
+                                        init = 0;
+                                    }
+
                                    // atCommand_tx.console = 1;
                                   //  debug_console();
                                    // wifi_timer = 0;
@@ -2518,6 +2531,7 @@ void atCommandManager(uint16_t command)
             atCommand_tx.len = AT_RESTORE(LEN);
             memcpy(&(atCommand_tx.str[0]), AT_RESTORE(STR), atCommand_tx.len);
         }
+        break;
         default : break;
     }
     if(atCommand_tx.tx_flag)
@@ -2985,7 +2999,7 @@ void mqtt_manager(void)
                 case MMQT_SUBSCRIBE_OK:
                 {
                     //gen.leds_duty[0] = 0.2;
-                    if(mqtt.send_counter >= 10 )
+                    if(mqtt.send_counter >= 4 )
                     {
                         mqtt.send_counter = 0;
                         s = ">";
@@ -3396,6 +3410,7 @@ uint16_t IPD_parser(const char * str)
         {
             esp8266.station[1].status = TCP_CLIENT_IS_CONNECTED;
             esp8266.station[1].lost_connection = 0;
+            esp8266.station[0].lost_connection = 0;
             memcpy(&data_rx[0], &esp8266.AT_rx_buff[n + 2], 32);
             idc_rect = data_rx[5];
         }
