@@ -152,7 +152,7 @@ void number_to_string (uint16_t num, MQTT_VAR * var);
 void mqtt_parser(char * data);
 uint16_t waitATReceive_nonbloking(const char * at, uint16_t len, uint16_t timeout);
 uint16_t waitATReceive_nonbloking_service(const char * at, uint16_t len, uint16_t timeout);
-uint16_t IPD_parser(const char * str);
+uint16_t IPD_parser(const char * str, uint16_t kn);
 uint16_t atStatusParser(const char * str);
 uint16_t AT_parser(const char * str);
 void portSeeker(const char * str_src, uint16_t len_1,  ESP8266 * esp);
@@ -304,6 +304,7 @@ uint16_t f_err = 0;
 char cwjap_mem[60];
 uint16_t cwjap_len = 16;
 uint16_t cwjap_counter = 0;
+uint16_t dev_num = 1;
 //char cwsap_mem[60];
 //uint16_t cwsap_len = 16;
 //
@@ -1983,7 +1984,7 @@ void initWiFi_station(void)
                                     else
                                     {
                                         cwjap_counter = 0;
-                                        esp8266.c_status = ESP8266_CWJAP_TERMINAL_OK;
+                                        esp8266.c_status = ESP8266_CWJAP_TERMINAL_NF;
                                         EPwm4Regs.TBPRD = (base * PERIOD_MULTIPLIER_TIM);
                                         init = 0;
                                     }
@@ -2281,17 +2282,21 @@ __interrupt void sci_isr(void)
     {
       memcpy(&data_rx_mqtt[0], &esp8266.AT_rx_buff[2], 64);
     }
-    if (stringSeeker(s1, s_1, 10, 3, &n))
+    if (stringSeeker(s1, s_0, 10, 3, &n))
     {
-        IPD_parser(s1);
+        IPD_parser(s1, 0);
+    }
+    else if (stringSeeker(s1, s_1, 10, 3, &n))
+    {
+        IPD_parser(s1, 1);
     }
     else if (stringSeeker(s1, s_2, 10, 3, &n))
     {
-        IPD_parser(s1);
+        IPD_parser(s1, 2);
     }
     else if (stringSeeker(s1, s_3, 10, 3, &n))
     {
-        IPD_parser(s1);
+        IPD_parser(s1, 3);
     }
 
     if (stringSeeker(s1, s_send_ok, 16, 5, &n))
@@ -2613,7 +2618,7 @@ uint16_t connection_manager(void)
                     remote_data[38]  = 0;
                     remote_data[39]  = 0;
 
-                    if(esp8266.c_status == ESP8266_CWJAP_TERMINAL_OK)
+                    //if(esp8266.c_status == ESP8266_CWJAP_TERMINAL_OK)
                     {   if(MMQT_SUBSCRIBE_OK == (mqtt.state_machine))
                         {
                            switch(var_counter)
@@ -2699,6 +2704,10 @@ uint16_t connection_manager(void)
                         }
                         if(cnt >= STATUS_Q_MQTT)
                         {
+                            if(esp8266.c_status == ESP8266_CWJAP_TERMINAL_NF)
+                            {
+                                mqtt.state_machine = MMQT_READY_TO_STATUS;
+                            }
                             mqtt_manager();
                             cnt = 1;
                         }
@@ -2888,7 +2897,8 @@ void mqtt_manager(void)
                                    {
                                        memset(data_rx_mqtt,0,sizeof(data_rx_mqtt));
                                        data_rx_service[1] = 0;
-                                       mqtt.lost_connection_timer = 0;
+                                      mqtt.lost_connection_timer = 0;
+                                       //++mqtt.lost_connection_timer;
                                    }
                                    else
                                    {
@@ -3115,6 +3125,7 @@ void mqtt_manager(void)
                 {
                     mqtt.state_machine = MMQT_SUBSCRIBE_OK;
                     esp8266.station[1].status = TCP_CLIENT_IS_NOT_CONNECTED;
+
                 }
                 break;
                 default:
@@ -3401,19 +3412,28 @@ void device_manager(void)
 {
    ;
 }
-uint16_t IPD_parser(const char * str)
+uint16_t IPD_parser(const char * str , uint16_t kn)
 {
     uint16_t n = 0;
     const char *s_head = "@@"; //0x40 0x40
     const char *s1 = (char*) esp8266.AT_rx_buff;
-        if(stringSeeker(s1,s_head, 100,2, &n))
-        {
-            esp8266.station[1].status = TCP_CLIENT_IS_CONNECTED;
-            esp8266.station[1].lost_connection = 0;
-            esp8266.station[0].lost_connection = 0;
-            memcpy(&data_rx[0], &esp8266.AT_rx_buff[n + 2], 32);
-            idc_rect = data_rx[5];
-        }
+//    switch (n)
+ //   {
+  //      case 1:
+   //     {
+            if(stringSeeker(s1,s_head, 100,2, &n))
+            {
+                //sdev_num = 1;
+                esp8266.station[1].status = TCP_CLIENT_IS_CONNECTED;
+                esp8266.station[1].lost_connection = 0;
+                esp8266.station[0].lost_connection = 0;
+                memcpy(&data_rx[0], &esp8266.AT_rx_buff[n + 2], 32);
+                idc_rect = data_rx[5];
+            }
+     //   }
+    //    break;
+  //  default : break;
+  //  }
     return n;
 }
 uint16_t atStatusParser(const char * str)
