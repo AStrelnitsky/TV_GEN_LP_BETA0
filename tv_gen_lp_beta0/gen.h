@@ -62,7 +62,7 @@ typedef struct
     uint16_t f1, f2;
     float ul, uh;
     float k1,k2,k3;
-    uint32_t  lost_connection_timer;
+    uint32_t  lost_connection_timer, lost_connection_timer_1;
     float kp_u, ki_u, af, pi_limit_hi, pi_limit_low;
     uint16_t dD;
     uint16_t send_counter;
@@ -388,6 +388,7 @@ typedef enum
     ESP8266_CWJAP_TERMINAL_TX,
     ESP8266_CWJAP_TERMINAL_OK,
     ESP8266_CWJAP_TERMINAL_NF,
+    ESP8266_CWJAP_TERMINAL_LR,
     ESP8266_INIT_FINISH_TX,
     ESP8266_INIT_FINISH_WITH_TERMINAL,
     ESP8266_INIT_FINISH_WITH_NO_TERMINAL,
