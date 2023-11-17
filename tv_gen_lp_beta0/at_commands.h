@@ -41,7 +41,7 @@
 #define AT_CWMODE_AP_STA(x)                                         (x == 0 ? 18 : ((x) == 1 ? "AT+CWMODE_CUR=3\r\n" : 17))
 #define AT_CWSAP_TERMINAL(x)                                        (x == 0 ? 19 : ((x) == 1 ? "AT+CWSAP=\"ReasonanceKickChargeTerminal\",\"100@101@\",11,3\r\n" : 57))// (x == 0 ? 19 : ((x) == 1 ? "AT+CWSAP=\"ReasonanceKickChargeTerminal\",\"100@101@\",5,3\r\n" : 56))
 //#define AT_CWJAP_TERMINAL(x)                                        (x == 0 ? 20 : ((x) == 1 ? "AT+CWJAP=\"ReasonanceHub\",\"100@101@\"\r\n" : 37))//(x == 0 ? 20 : ((x) == 1 ? "AT+CWJAP=\"ReasonanceUpdateFirmware_11.1\",\"100@101@\"\r\n" : 53))//(x == 0 ? 20 : ((x) == 1 ? "AT+CWJAP=\"ReasonanceKickChargeTerminal\",\"100@101@\"\r\n" : 52))
-#define AT_CWJAP_TERMINAL(x)                                        (x == 0 ? 20 : ((x) == 1 ? "AT+CWJAP=\"SoiLAB\",\"makers@123\"\r\n" : 32))//(x == 0 ? 20 : ((x) == 1 ? "AT+CWJAP=\"ReasonanceHut\",\"100@101@\"\r\n" : 37))
+#define AT_CWJAP_TERMINAL(x)                                        (x == 0 ? 20 : ((x) == 1 ? "AT+CWJAP=\"SoiLAB\",\"makers@123\"\r\n" : 32))//(x == 0 ? 20 : ((x) == 1 ? "AT+CWJAP=\"SoiLAB\",\"makers@123\"\r\n" : 32))
 #define AT_CIPSTART_TCP_TERMINAL(x)                                 (x == 0 ? 21 : ((x) == 1 ? "AT+CIPSTART=\"TCP\",\"192.168.4.2\",8,7200\r\n" : 40))
 #define AT_CIPSEND_STA_ID1(x)                                       (x == 0 ? 22 : ((x) == 1 ? "AT+CIPSEND=1,64\r\n" : 17 ))
 #define AT_CIPSTART_MMQT(x)                                         (x == 0 ? 23 : ((x) == 1 ? "AT+CIPSTART=0,\"TCP\",\"driver.cloudmqtt.com\",18793\r\n" : 50))//(x == 0 ? 23 : ((x) == 1 ? "AT+CIPSTART=0,\"TCP\",\"driver.cloudmqtt.com\",18737\r\n" : 50))//(x == 0 ? 23 : ((x) == 1 ? "AT+CIPSTART=\"TCP\",\"driver.cloudmqtt.com\",18737\r\n" : 48))
@@ -52,6 +52,6 @@
 #define AT_CIPSEND_STA_ID0_MQTT_DATA(x)                             (x == 0 ? 28 : ((x) == 1 ? "AT+CIPSEND=0,46\r\n" : 17 ))
 #define AT_UART_CONFIG(x)                                           (x == 0 ? 29 : ((x) == 1 ? "AT+UART_CUR=2500000,8,1,0,0\r\n" : 29 ))//(x == 0 ? 29 : ((x) == 1 ? "AT+UART_CUR=2304000,8,1,0,0\r\n" : 29 ))
 #define AT_CIPSEND_STA_ID0_MQTT_SUBSCRIPTION(x)                     (x == 0 ? 30 : ((x) == 1 ? "AT+CIPSEND=0,37\r\n" : 17 ))//(x == 0 ? 30 : ((x) == 1 ? "AT+CIPSEND=0,18\r\n" : 17 ))
-#define AT_CIPCLOSE(x)                                              (x == 0 ? 31 : ((x) == 1 ? "AT+CIPCLOSE=1\r\n" : 15 ))
+#define AT_CIPCLOSE(x)                                              (x == 0 ? 31 : ((x) == 1 ? "AT+CIPCLOSE=0\r\n" : 15 ))
 #define AT_RESTORE(x)                                               (x == 0 ? 32 : ((x) == 1 ? "AT+RESTORE\r\n" : 12 ))
 #endif /* F2802X_COMMON_INCLUDE_AT_COMMANDS_H_ */

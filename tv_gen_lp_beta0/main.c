@@ -1967,6 +1967,8 @@ void initWiFi_station(void)
                                 //s_at_1 = "CONECTED";
                                 //s_at_1 = "OK";
                                 s_at_1 = "GOT";
+                                init = 1;
+                                init_hack = 1;
                                 ///TRY TO CONNECT TO TERMIAL
                                 atCommand_tx.tx_flag = 1;
                                 esp8266.c_status = ESP8266_CWJAP_TERMINAL_TX;
@@ -1983,7 +1985,7 @@ void initWiFi_station(void)
                                 }
                                 else
                                 {
-                                    if(cwjap_counter < 2)
+                                    if(cwjap_counter < 3)
                                     {
                                         esp8266.c_status = ESP8266_IDLE;
                                         ++cwjap_counter;
@@ -2260,8 +2262,10 @@ __interrupt void sci_isr(void)
     const char *s_1 = "D,1";
     const char *s_2 = "D,2";
     const char *s_3 = "D,3";
+    const char *s_4 = "D,4";
     const char *s_dis = "US:";
     const char *s_send_ok = "ND OK";
+    const char *s_got = "GOT";
     sciReadBuff();
     EALLOW;
     SciaRegs.SCICTL1.bit.SWRESET = 0;
@@ -2276,6 +2280,10 @@ __interrupt void sci_isr(void)
 
     s1 = (char*) (esp8266.AT_rx_buff);
 
+    if (stringSeeker(s1, s_got, 32 ,3, &n))
+    {
+        esp8266.c_status = ESP8266_CWJAP_TERMINAL_OK;
+    }
     if(stringSeeker(s1, s_dis, 32, 3, &n))
     {
         atStatusParser(s1);
@@ -2305,6 +2313,10 @@ __interrupt void sci_isr(void)
     else if (stringSeeker(s1, s_3, 10, 3, &n))
     {
         IPD_parser(s1, 3);
+    }
+    else if (stringSeeker(s1, s_4, 10, 3, &n))
+    {
+        IPD_parser(s1, 4);
     }
 
     if (stringSeeker(s1, s_send_ok, 16, 5, &n))
@@ -2716,7 +2728,10 @@ uint16_t connection_manager(void)
                             {
                                 mqtt.state_machine = MMQT_READY_TO_STATUS;
                             }
-                            mqtt_manager();
+                            if(esp8266.c_status != ESP8266_CWJAP_TERMINAL_DEBUG)
+                            {
+                                mqtt_manager();
+                            }
                             cnt = 1;
                         }
                         else
@@ -2908,12 +2923,7 @@ void mqtt_manager(void)
                                        mqtt.lost_connection_timer = 0;
                                        if(mqtt.lost_connection_timer_1 > 3)
                                        {
-                                           esp8266.c_status = ESP8266_CWJAP_TERMINAL_LR;
-                                           //resetLoops(&gen);
-                                           //while(1)
-                                          // {
-                                          //     ;
-                                          // }
+                                           //esp8266.c_status = ESP8266_CWJAP_TERMINAL_LR;
                                        }
                                        else
                                        {
@@ -3030,30 +3040,34 @@ void mqtt_manager(void)
                 case MMQT_SUBSCRIBE_OK:
                 {
                     //gen.leds_duty[0] = 0.2;
-                    if(mqtt.send_counter >= 4 )
+                    if(esp8266.c_status == ESP8266_CWJAP_TERMINAL_OK)
                     {
-                        mqtt.send_counter = 0;
-                        s = ">";
-                        init = waitATReceive_nonbloking_service(s,1, WIFI_TIMER_OVERFLOW);
-                        if(init == 2)
+                        if(mqtt.send_counter >= 4 )
                         {
-                             data_rx_service[0] = 0;
-                             mqtt.state_machine = MMQT_PREPARE_DATA_SEND_OK;
-                        }
-                        else if(init == 3)
-                        {
-                                publish_counter = 0;
-                                atCommand_tx.tx_flag = 1;
-                                atCommandManager((int)AT_CIPSEND_STA_ID0_MQTT_DATA(NUM));
-                        }
+                            mqtt.send_counter = 0;
+                            s = ">";
+                            init = waitATReceive_nonbloking_service(s,1, WIFI_TIMER_OVERFLOW);
+                            if(init == 2)
+                            {
+                                 data_rx_service[0] = 0;
+                                 mqtt.state_machine = MMQT_PREPARE_DATA_SEND_OK;
+                                // esp8266.station[0].lost_connection = 0;
+                            }
+                            else if(init == 3)
+                            {
+                                    publish_counter = 0;
+                                    atCommand_tx.tx_flag = 1;
+                                    atCommandManager((int)AT_CIPSEND_STA_ID0_MQTT_DATA(NUM));
+                            }
 
-                  //  atCommand_tx.tx_flag = 1;
-                   // atCommandManager((int)AT_CIPSEND_STA_ID0_MQTT_DATA(NUM));
-                   // mqtt.state_machine = MMQT_PREPARE_DATA_SEND_TX;
-                    }
-                    else
-                    {
-                        ++(mqtt.send_counter);
+                      //  atCommand_tx.tx_flag = 1;
+                       // atCommandManager((int)AT_CIPSEND_STA_ID0_MQTT_DATA(NUM));
+                       // mqtt.state_machine = MMQT_PREPARE_DATA_SEND_TX;
+                        }
+                        else
+                        {
+                            ++(mqtt.send_counter);
+                        }
                     }
 
                 }
@@ -3096,6 +3110,7 @@ void mqtt_manager(void)
                     {
                         data_rx_service[1] = 0;
                         mqtt.state_machine = MMQT_DATA_SEND_OK;
+                        esp8266.station[0].lost_connection = 0;
                     }
                     else if(init == 3)
                     {
@@ -3125,10 +3140,21 @@ void mqtt_manager(void)
                     if(esp8266.status_counter >= STATUS_Q)
                     {
                         esp8266.status_counter = 0;
-                       if(esp8266.station[1].status == TCP_CLIENT_IS_DISCONNECTED)
+                        if(esp8266.station[0].lost_connection > LOST_CONNECTION_TIMEOUT)
+                        {
+                            esp8266.station[0].status = TCP_CLIENT_IS_DISCONNECTED;
+                            esp8266.c_status = ESP8266_CWJAP_TERMINAL_NF;
+                            esp8266.station[0].lost_connection = 0;
+                        }
+                        else
+                        {
+                            ++esp8266.station[0].lost_connection;
+                        }
+                       //if((esp8266.station[0].status == TCP_CLIENT_IS_DISCONNECTED) && (esp8266.c_status == ESP8266_CWJAP_TERMINAL_OK))
+                        if((esp8266.station[0].status == TCP_CLIENT_IS_NOT_CONNECTED))// && (esp8266.c_status == ESP8266_CWJAP_TERMINAL_OK))
                        {
-                         // atCommand_tx.tx_flag = 1;
-                         // atCommandManager((int) AT_CIPCLOSE(NUM)); //FOR THE TEST
+                          atCommand_tx.tx_flag = 1;
+                          atCommandManager((int) AT_CIPCLOSE(NUM)); //FOR THE TEST
                           mqtt.state_machine = MMQT_READY_TO_CLOSE_DEVICE;
                        }
                        else
@@ -3145,7 +3171,7 @@ void mqtt_manager(void)
                 case MMQT_READY_TO_CLOSE_DEVICE:
                 {
                     mqtt.state_machine = MMQT_SUBSCRIBE_OK;
-                    esp8266.station[1].status = TCP_CLIENT_IS_NOT_CONNECTED;
+                    esp8266.station[0].status = TCP_CLIENT_IS_NOT_CONNECTED;
 
                 }
                 break;
@@ -3447,9 +3473,12 @@ uint16_t IPD_parser(const char * str , uint16_t kn)
                 //sdev_num = 1;
                 esp8266.station[1].status = TCP_CLIENT_IS_CONNECTED;
                 esp8266.station[1].lost_connection = 0;
-                esp8266.station[0].lost_connection = 0;
                 memcpy(&data_rx[0], &esp8266.AT_rx_buff[n + 2], 32);
                 idc_rect = data_rx[5];
+            }
+            else
+            {
+            //    esp8266.station[0].lost_connection = 0;
             }
      //   }
     //    break;
@@ -3469,6 +3498,7 @@ uint16_t AT_parser(const char * str)
     const char *s_status = "+CIPSTATUS:";
     const char *s_serv = ">";
     const char *s_alr = "ALR";
+
     if (stringSeeker(str, s_status, 128 ,11, &n))
     {
         n =  atStatusParser(str);
@@ -3482,6 +3512,7 @@ uint16_t AT_parser(const char * str)
     {
         data_rx_service[0] = esp8266.AT_rx_buff[n];
     }
+
     return n;
 }
 void portSeeker(const char * str_src, uint16_t len_1,  ESP8266 * esp)
@@ -3495,6 +3526,7 @@ void portSeeker(const char * str_src, uint16_t len_1,  ESP8266 * esp)
     const char *c_status_2 = "CIPSTATUS:2";
     const char *c_status_3 = "CIPSTATUS:3";
     int i,j = 0;
+    ++(esp->station[0].lost_connection);
     if(stringSeeker(str_src, c_status_0, len_1, len_2, &n))
     {
        n = 0;
@@ -3515,26 +3547,27 @@ void portSeeker(const char * str_src, uint16_t len_1,  ESP8266 * esp)
                                 }
                             }
         }
-        esp8266.station[n].status = TCP_CLIENT_IS_CONNECTED;
-                 /*
-                 if(esp8266.station[n].status == TCP_CLIENT_IS_NOT_CONNECTED)
+       // esp8266.station[n].status = TCP_CLIENT_IS_CONNECTED;
+
+                 if(esp8266.station[0].status == TCP_CLIENT_IS_NOT_CONNECTED)
                                   {
-                                      esp8266.station[n].status = TCP_CLIENT_IS_CONNECTED;
+                                      esp8266.station[0].status = TCP_CLIENT_IS_CONNECTED;
+                                      mqtt.state_machine = MQTT_CONNECT_TO_SERVER;
                                      // atCommand_tx.tx_flag = 1;
                                     //  esp8266.c_status = ESP8266_CIPSERVER_TX;
                                     //  atCommandManager((int)AT_CIPSTART_UDP(NUM));
                                   }
-                                  else if(esp->station[n].lost_connection < (4*DEVICE_LOST_TIMEOUT))
+                                  else if(esp->station[0].lost_connection < (4*DEVICE_LOST_TIMEOUT))
                                   {
-                                     ++(esp->station[n].lost_connection);
+                                     ++(esp->station[0].lost_connection);
                                   }
                                   else
                                   {
-                                      esp->station[n].lost_connection = 0;
-                                      esp8266.station[n].status = TCP_CLIENT_IS_DISCONNECTED;
+                                      esp->station[0].lost_connection = 0;
+                                      esp8266.station[0].status = TCP_CLIENT_IS_DISCONNECTED;
                                       esp8266.c_status = ESP8266_CWJAP_TERMINAL_NF;
                                   }
-                                  */
+
     }
     if (stringSeeker(str_src, c_status_1, len_1, len_2, &n))
     {
@@ -3595,7 +3628,25 @@ void portSeeker(const char * str_src, uint16_t len_1,  ESP8266 * esp)
                              }
                          }
                    }
-              esp8266.station[n].status = TCP_CLIENT_IS_CONNECTED;
+       if(esp8266.station[0].status == TCP_CLIENT_IS_NOT_CONNECTED)
+                                         {
+                                             esp8266.station[0].status = TCP_CLIENT_IS_CONNECTED;
+                                             mqtt.state_machine = MQTT_CONNECT_TO_SERVER;
+                                            // atCommand_tx.tx_flag = 1;
+                                           //  esp8266.c_status = ESP8266_CIPSERVER_TX;
+                                           //  atCommandManager((int)AT_CIPSTART_UDP(NUM));
+                                         }
+                                         else if(esp->station[0].lost_connection < (4*DEVICE_LOST_TIMEOUT))
+                                         {
+                                            ++(esp->station[0].lost_connection);
+                                         }
+                                         else
+                                         {
+                                             esp->station[0].lost_connection = 0;
+                                             esp8266.station[0].status = TCP_CLIENT_IS_DISCONNECTED;
+                                             esp8266.c_status = ESP8266_CWJAP_TERMINAL_NF;
+                                         }
+
     }
     if(stringSeeker(str_src, c_status_3, len_1, len_2, &n))
     {
@@ -3617,7 +3668,25 @@ void portSeeker(const char * str_src, uint16_t len_1,  ESP8266 * esp)
                                 }
                             }
                       }
-                 esp8266.station[n].status = TCP_CLIENT_IS_CONNECTED;
+       if(esp8266.station[0].status == TCP_CLIENT_IS_NOT_CONNECTED)
+                                         {
+                                             esp8266.station[0].status = TCP_CLIENT_IS_CONNECTED;
+                                             mqtt.state_machine = MQTT_CONNECT_TO_SERVER;
+                                            // atCommand_tx.tx_flag = 1;
+                                           //  esp8266.c_status = ESP8266_CIPSERVER_TX;
+                                           //  atCommandManager((int)AT_CIPSTART_UDP(NUM));
+                                         }
+                                         else if(esp->station[0].lost_connection < (4*DEVICE_LOST_TIMEOUT))
+                                         {
+                                            ++(esp->station[0].lost_connection);
+                                         }
+                                         else
+                                         {
+                                             esp->station[0].lost_connection = 0;
+                                             esp8266.station[0].status = TCP_CLIENT_IS_DISCONNECTED;
+                                             esp8266.c_status = ESP8266_CWJAP_TERMINAL_NF;
+                                         }
+
     }
 }
 /*
