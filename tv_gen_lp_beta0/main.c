@@ -782,7 +782,7 @@ __interrupt void cpu_timer1_isr(void)
                              gen.leds_duty[0] = 0.2;
                              gen.leds_duty[2] = 0.0;
                           }
-                             ++(esp8266.station[1].lost_connection);
+                          ++(esp8266.station[1].lost_connection);
                       }
                     }
                     burst_duty = amp_fix;//1.0;
@@ -1249,6 +1249,8 @@ void gen_initial_conditions(void)
     memset(data_rx_mqtt,0,64);
     esp8266.station[0].status = TCP_CLIENT_IS_NOT_CONNECTED;
     esp8266.station[1].status = TCP_CLIENT_IS_NOT_CONNECTED;
+    esp8266.station[0].channel = '0';
+    esp8266.station[1].channel = '1';
     gen.pi_u.kd = _IQ(0.0);
     gen.pi_u.ki = _IQ(0.1);
     gen.pi_u.kp = _IQ(0.2);
@@ -2541,8 +2543,11 @@ void atCommandManager(uint16_t command)
         break;
         case ((int)AT_CIPCLOSE(NUM)):
         {
-            atCommand_tx.len = AT_CIPCLOSE(LEN);
-            memcpy(&(atCommand_tx.str[0]), AT_CIPCLOSE(STR), atCommand_tx.len);
+            //if(esp8266.station[0].channel != esp8266.station[1].channel)
+                atCommand_tx.len = AT_CIPCLOSE(LEN);
+                memcpy(&(atCommand_tx.str[0]), AT_CIPCLOSE(STR), atCommand_tx.len);
+                atCommand_tx.str[12] = esp8266.station[0].channel;
+
         }
         break;
         case ((int) AT_CIPSTART_UDP(NUM)):
@@ -2555,6 +2560,12 @@ void atCommandManager(uint16_t command)
         {
             atCommand_tx.len = AT_RESTORE(LEN);
             memcpy(&(atCommand_tx.str[0]), AT_RESTORE(STR), atCommand_tx.len);
+        }
+        break;
+        case ((int)AT_CWQAP(NUM)):
+        {
+            atCommand_tx.len = AT_CWQAP(LEN);
+            memcpy(&(atCommand_tx.str[0]), AT_CWQAP(STR), atCommand_tx.len);
         }
         break;
         default : break;
@@ -3154,7 +3165,8 @@ void mqtt_manager(void)
                         if((esp8266.station[0].status == TCP_CLIENT_IS_NOT_CONNECTED))// && (esp8266.c_status == ESP8266_CWJAP_TERMINAL_OK))
                        {
                           atCommand_tx.tx_flag = 1;
-                          atCommandManager((int) AT_CIPCLOSE(NUM)); //FOR THE TEST
+                         // atCommandManager((int) AT_CIPCLOSE(NUM)); //FOR THE TEST
+                          atCommandManager((int) AT_CWQAP(NUM));
                           mqtt.state_machine = MMQT_READY_TO_CLOSE_DEVICE;
                        }
                        else
@@ -3473,6 +3485,7 @@ uint16_t IPD_parser(const char * str , uint16_t kn)
                 //sdev_num = 1;
                 esp8266.station[1].status = TCP_CLIENT_IS_CONNECTED;
                 esp8266.station[1].lost_connection = 0;
+                esp8266.station[1].channel = (char)(kn + 48);
                 memcpy(&data_rx[0], &esp8266.AT_rx_buff[n + 2], 32);
                 idc_rect = data_rx[5];
             }
@@ -3531,6 +3544,7 @@ void portSeeker(const char * str_src, uint16_t len_1,  ESP8266 * esp)
     {
        n = 0;
        str_tg = c_status_0;
+       /*
        for(i = 0; i < len_1; ++i )
        {
                             cut_string = &str_src[i];
@@ -3547,8 +3561,6 @@ void portSeeker(const char * str_src, uint16_t len_1,  ESP8266 * esp)
                                 }
                             }
         }
-       // esp8266.station[n].status = TCP_CLIENT_IS_CONNECTED;
-
                  if(esp8266.station[0].status == TCP_CLIENT_IS_NOT_CONNECTED)
                                   {
                                       esp8266.station[0].status = TCP_CLIENT_IS_CONNECTED;
@@ -3567,12 +3579,88 @@ void portSeeker(const char * str_src, uint16_t len_1,  ESP8266 * esp)
                                       esp8266.station[0].status = TCP_CLIENT_IS_DISCONNECTED;
                                       esp8266.c_status = ESP8266_CWJAP_TERMINAL_NF;
                                   }
+                                  */
+       if(((esp->station[1].channel) - 48) == n)
+       {
+                  for(i = 0; i < len_1; ++i )
+                             {
+                                    cut_string = &str_src[i];
+                                    if(!strncmp(cut_string, str_tg, len_2))
+                                    {
+                                            esp->station[1].port_size = 0;
+                                            for(j = 0; j < 5; ++j)
+                                            {
+                                                if(cut_string[j + len_2 + 1] != ',')
+                                                {
+                                                    esp->station[1].port[j] = cut_string[j + len_2 + 1];
+                                                    ++(esp->station[1].port_size);
+                                                }
+                                            }
 
+                                    }
+                              }
+                  if(esp8266.station[1].status == TCP_CLIENT_IS_NOT_CONNECTED)
+                  {
+                     esp8266.station[1].status = TCP_CLIENT_IS_CONNECTED;
+                  }
+                  /*
+                  else if(esp->station[1].lost_connection < (4*DEVICE_LOST_TIMEOUT))
+                  {
+                     ++(esp->station[1].lost_connection);
+                  }
+                  else
+                  {
+                     esp->station[1].lost_connection = 0;
+
+                  }
+                  */
+
+             }
+             else
+             {
+                 esp->station[0].channel = n + 48;
+                        for(i = 0; i < len_1; ++i )
+                        {
+                                          cut_string = &str_src[i];
+                                          if(!strncmp(cut_string, str_tg, len_2))
+                                          {
+                                                  esp->station[0].port_size = 0;
+                                                  for(j = 0; j < 5; ++j)
+                                                  {
+                                                      if(cut_string[j + len_2 + 1] != ',')
+                                                      {
+                                                          esp->station[0].port[j] = cut_string[j + len_2 + 1];
+                                                          ++(esp->station[0].port_size);
+                                                      }
+                                                  }
+
+                                          }
+                        }
+                        if(esp8266.station[0].status == TCP_CLIENT_IS_NOT_CONNECTED)
+                        {
+                                                              esp8266.station[0].status = TCP_CLIENT_IS_CONNECTED;
+                                                              mqtt.state_machine = MQTT_CONNECT_TO_SERVER;
+                                                             // atCommand_tx.tx_flag = 1;
+                                                            //  esp8266.c_status = ESP8266_CIPSERVER_TX;
+                                                            //  atCommandManager((int)AT_CIPSTART_UDP(NUM));
+                        }
+                        else if(esp->station[0].lost_connection < (4*DEVICE_LOST_TIMEOUT))
+                        {
+                                                             ++(esp->station[0].lost_connection);
+                        }
+                        else
+                        {
+                                                              esp->station[0].lost_connection = 0;
+                                                              esp8266.station[0].status = TCP_CLIENT_IS_DISCONNECTED;
+                                                              esp8266.c_status = ESP8266_CWJAP_TERMINAL_NF;
+                        }
+              }
     }
     if (stringSeeker(str_src, c_status_1, len_1, len_2, &n))
     {
        n = 1;
        str_tg = c_status_1;
+       /*
        for(i = 0; i < len_1; ++i )
                      {
                             cut_string = &str_src[i];
@@ -3607,87 +3695,243 @@ void portSeeker(const char * str_src, uint16_t len_1,  ESP8266 * esp)
                      resetLoops(&gen);
                    //  esp8266.c_status = ESP8266_CWJAP_TERMINAL_LR;
                  }
+                 */
+       if(((esp->station[1].channel) - 48) == n)
+              {
+                         for(i = 0; i < len_1; ++i )
+                                    {
+                                           cut_string = &str_src[i];
+                                           if(!strncmp(cut_string, str_tg, len_2))
+                                           {
+                                                   esp->station[1].port_size = 0;
+                                                   for(j = 0; j < 5; ++j)
+                                                   {
+                                                       if(cut_string[j + len_2 + 1] != ',')
+                                                       {
+                                                           esp->station[1].port[j] = cut_string[j + len_2 + 1];
+                                                           ++(esp->station[1].port_size);
+                                                       }
+                                                   }
+
+                                           }
+                                     }
+                         if(esp8266.station[1].status == TCP_CLIENT_IS_NOT_CONNECTED)
+                         {
+                            esp8266.station[1].status = TCP_CLIENT_IS_CONNECTED;
+                         }
+                         /*
+                         else if(esp->station[1].lost_connection < (4*DEVICE_LOST_TIMEOUT))
+                         {
+                            ++(esp->station[1].lost_connection);
+                         }
+                         else
+                         {
+                            esp->station[1].lost_connection = 0;
+
+                         }
+                         */
+
+                    }
+                    else
+                    {
+                        esp->station[0].channel = n + 48;
+                               for(i = 0; i < len_1; ++i )
+                               {
+                                                 cut_string = &str_src[i];
+                                                 if(!strncmp(cut_string, str_tg, len_2))
+                                                 {
+                                                         esp->station[0].port_size = 0;
+                                                         for(j = 0; j < 5; ++j)
+                                                         {
+                                                             if(cut_string[j + len_2 + 1] != ',')
+                                                             {
+                                                                 esp->station[0].port[j] = cut_string[j + len_2 + 1];
+                                                                 ++(esp->station[0].port_size);
+                                                             }
+                                                         }
+
+                                                 }
+                               }
+                               if(esp8266.station[0].status == TCP_CLIENT_IS_NOT_CONNECTED)
+                               {
+                                                                     esp8266.station[0].status = TCP_CLIENT_IS_CONNECTED;
+                                                                     mqtt.state_machine = MQTT_CONNECT_TO_SERVER;
+                                                                    // atCommand_tx.tx_flag = 1;
+                                                                   //  esp8266.c_status = ESP8266_CIPSERVER_TX;
+                                                                   //  atCommandManager((int)AT_CIPSTART_UDP(NUM));
+                               }
+                               else if(esp->station[0].lost_connection < (4*DEVICE_LOST_TIMEOUT))
+                               {
+                                                                    ++(esp->station[0].lost_connection);
+                               }
+                               else
+                               {
+                                                                     esp->station[0].lost_connection = 0;
+                                                                     esp8266.station[0].status = TCP_CLIENT_IS_DISCONNECTED;
+                                                                     esp8266.c_status = ESP8266_CWJAP_TERMINAL_NF;
+                               }
+                     }
     }
     if(stringSeeker(str_src, c_status_2, len_1, len_2, &n))
     {
-       n = 2;
-       str_tg = c_status_2;
-       for(i = 0; i < len_1; ++i )
-                  {
-                         cut_string = &str_src[i];
-                         if(!strncmp(cut_string, str_tg, len_2))
-                         {
-                             esp->station[n].port_size = 0;
-                             for(j = 0; j < 5; ++j)
-                             {
-                                 if(cut_string[j + len_2 + 1] != ',')
-                                 {
-                                     esp->station[n].port[j] = cut_string[j + len_2 + 1];
-                                     ++(esp->station[n].port_size);
-                                 }
-                             }
-                         }
-                   }
-       if(esp8266.station[0].status == TCP_CLIENT_IS_NOT_CONNECTED)
-                                         {
-                                             esp8266.station[0].status = TCP_CLIENT_IS_CONNECTED;
-                                             mqtt.state_machine = MQTT_CONNECT_TO_SERVER;
-                                            // atCommand_tx.tx_flag = 1;
-                                           //  esp8266.c_status = ESP8266_CIPSERVER_TX;
-                                           //  atCommandManager((int)AT_CIPSTART_UDP(NUM));
-                                         }
-                                         else if(esp->station[0].lost_connection < (4*DEVICE_LOST_TIMEOUT))
-                                         {
-                                            ++(esp->station[0].lost_connection);
-                                         }
-                                         else
-                                         {
-                                             esp->station[0].lost_connection = 0;
-                                             esp8266.station[0].status = TCP_CLIENT_IS_DISCONNECTED;
-                                             esp8266.c_status = ESP8266_CWJAP_TERMINAL_NF;
-                                         }
+      n = 2;
+      str_tg = c_status_2;
+      if(((esp->station[1].channel) - 48) == n)
+             {
+                        for(i = 0; i < len_1; ++i )
+                                   {
+                                          cut_string = &str_src[i];
+                                          if(!strncmp(cut_string, str_tg, len_2))
+                                          {
+                                                  esp->station[1].port_size = 0;
+                                                  for(j = 0; j < 5; ++j)
+                                                  {
+                                                      if(cut_string[j + len_2 + 1] != ',')
+                                                      {
+                                                          esp->station[1].port[j] = cut_string[j + len_2 + 1];
+                                                          ++(esp->station[1].port_size);
+                                                      }
+                                                  }
 
+                                          }
+                                    }
+                        /*
+                        if(esp8266.station[1].status == TCP_CLIENT_IS_NOT_CONNECTED)
+                        {
+                           esp8266.station[1].status = TCP_CLIENT_IS_CONNECTED;
+                        }
+                        else if(esp->station[1].lost_connection < (4*DEVICE_LOST_TIMEOUT))
+                        {
+                           ++(esp->station[1].lost_connection);
+                        }
+                        else
+                        {
+                           esp->station[1].lost_connection = 0;
+
+                        }
+                        */
+
+                   }
+                   else
+                   {
+                       esp->station[0].channel = n + 48;
+                              for(i = 0; i < len_1; ++i )
+                              {
+                                                cut_string = &str_src[i];
+                                                if(!strncmp(cut_string, str_tg, len_2))
+                                                {
+                                                        esp->station[0].port_size = 0;
+                                                        for(j = 0; j < 5; ++j)
+                                                        {
+                                                            if(cut_string[j + len_2 + 1] != ',')
+                                                            {
+                                                                esp->station[0].port[j] = cut_string[j + len_2 + 1];
+                                                                ++(esp->station[0].port_size);
+                                                            }
+                                                        }
+
+                                                }
+                              }
+                              if(esp8266.station[0].status == TCP_CLIENT_IS_NOT_CONNECTED)
+                              {
+                                                                    esp8266.station[0].status = TCP_CLIENT_IS_CONNECTED;
+                                                                    mqtt.state_machine = MQTT_CONNECT_TO_SERVER;
+                                                                   // atCommand_tx.tx_flag = 1;
+                                                                  //  esp8266.c_status = ESP8266_CIPSERVER_TX;
+                                                                  //  atCommandManager((int)AT_CIPSTART_UDP(NUM));
+                              }
+                              else if(esp->station[0].lost_connection < (4*DEVICE_LOST_TIMEOUT))
+                              {
+                                                                   ++(esp->station[0].lost_connection);
+                              }
+                              else
+                              {
+                                                                    esp->station[0].lost_connection = 0;
+                                                                    esp8266.station[0].status = TCP_CLIENT_IS_DISCONNECTED;
+                                                                    esp8266.c_status = ESP8266_CWJAP_TERMINAL_NF;
+                              }
+                    }
     }
     if(stringSeeker(str_src, c_status_3, len_1, len_2, &n))
     {
        n = 3;
        str_tg = c_status_3;
-       for(i = 0; i < len_1; ++i )
-                     {
-                            cut_string = &str_src[i];
-                            if(!strncmp(cut_string, str_tg, len_2))
-                            {
-                                esp->station[n].port_size = 0;
-                                for(j = 0; j < 5; ++j)
-                                {
-                                    if(cut_string[j + len_2 + 1] != ',')
+       if(((esp->station[1].channel) - 48) == n)
+              {
+                         for(i = 0; i < len_1; ++i )
                                     {
-                                        esp->station[n].port[j] = cut_string[j + len_2 + 1];
-                                        ++(esp->station[n].port_size);
-                                    }
-                                }
-                            }
-                      }
-       if(esp8266.station[0].status == TCP_CLIENT_IS_NOT_CONNECTED)
-                                         {
-                                             esp8266.station[0].status = TCP_CLIENT_IS_CONNECTED;
-                                             mqtt.state_machine = MQTT_CONNECT_TO_SERVER;
-                                            // atCommand_tx.tx_flag = 1;
-                                           //  esp8266.c_status = ESP8266_CIPSERVER_TX;
-                                           //  atCommandManager((int)AT_CIPSTART_UDP(NUM));
-                                         }
-                                         else if(esp->station[0].lost_connection < (4*DEVICE_LOST_TIMEOUT))
-                                         {
-                                            ++(esp->station[0].lost_connection);
-                                         }
-                                         else
-                                         {
-                                             esp->station[0].lost_connection = 0;
-                                             esp8266.station[0].status = TCP_CLIENT_IS_DISCONNECTED;
-                                             esp8266.c_status = ESP8266_CWJAP_TERMINAL_NF;
-                                         }
+                                           cut_string = &str_src[i];
+                                           if(!strncmp(cut_string, str_tg, len_2))
+                                           {
+                                                   esp->station[1].port_size = 0;
+                                                   for(j = 0; j < 5; ++j)
+                                                   {
+                                                       if(cut_string[j + len_2 + 1] != ',')
+                                                       {
+                                                           esp->station[1].port[j] = cut_string[j + len_2 + 1];
+                                                           ++(esp->station[1].port_size);
+                                                       }
+                                                   }
 
-    }
+                                           }
+                                     }
+                         /*
+                         if(esp8266.station[1].status == TCP_CLIENT_IS_NOT_CONNECTED)
+                         {
+                            esp8266.station[1].status = TCP_CLIENT_IS_CONNECTED;
+                         }
+                         else if(esp->station[1].lost_connection < (4*DEVICE_LOST_TIMEOUT))
+                         {
+                            ++(esp->station[1].lost_connection);
+                         }
+                         else
+                         {
+                            esp->station[1].lost_connection = 0;
+
+                         }
+                         */
+
+                    }
+                    else
+                    {
+                        esp->station[0].channel = n + 48;
+                               for(i = 0; i < len_1; ++i )
+                               {
+                                                 cut_string = &str_src[i];
+                                                 if(!strncmp(cut_string, str_tg, len_2))
+                                                 {
+                                                         esp->station[0].port_size = 0;
+                                                         for(j = 0; j < 5; ++j)
+                                                         {
+                                                             if(cut_string[j + len_2 + 1] != ',')
+                                                             {
+                                                                 esp->station[0].port[j] = cut_string[j + len_2 + 1];
+                                                                 ++(esp->station[0].port_size);
+                                                             }
+                                                         }
+
+                                                 }
+                               }
+                               if(esp8266.station[0].status == TCP_CLIENT_IS_NOT_CONNECTED)
+                               {
+                                                                     esp8266.station[0].status = TCP_CLIENT_IS_CONNECTED;
+                                                                     mqtt.state_machine = MQTT_CONNECT_TO_SERVER;
+                                                                    // atCommand_tx.tx_flag = 1;
+                                                                   //  esp8266.c_status = ESP8266_CIPSERVER_TX;
+                                                                   //  atCommandManager((int)AT_CIPSTART_UDP(NUM));
+                               }
+                               else if(esp->station[0].lost_connection < (4*DEVICE_LOST_TIMEOUT))
+                               {
+                                                                    ++(esp->station[0].lost_connection);
+                               }
+                               else
+                               {
+                                                                     esp->station[0].lost_connection = 0;
+                                                                     esp8266.station[0].status = TCP_CLIENT_IS_DISCONNECTED;
+                                                                     esp8266.c_status = ESP8266_CWJAP_TERMINAL_NF;
+                               }
+                     }
+}
 }
 /*
 int min_int(uint16_t * data, uint16_t len)
