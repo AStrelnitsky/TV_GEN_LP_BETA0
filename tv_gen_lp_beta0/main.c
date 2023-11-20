@@ -878,6 +878,14 @@ __interrupt void cpu_timer1_isr(void)
 
        EPwm2Regs.TBPRD = base_led;
        EPwm2Regs.CMPA.half.CMPA = (gen.leds_duty[0])*(EPwm2Regs.TBPRD);
+       if(esp8266.c_status == ESP8266_CWJAP_TERMINAL_NF)
+       {
+           gen.leds_duty[1] = 0.2;
+       }
+       else
+       {
+           gen.leds_duty[1] = 0.0;
+       }
        EPwm2Regs.CMPB = (gen.leds_duty[1])*(EPwm2Regs.TBPRD);
 
        EPwm3Regs.TBPRD = base_led;
@@ -1272,6 +1280,7 @@ void gen_initial_conditions(void)
     mqtt.af = 1.0;
     mqtt.freq = 3200.0;//5000.0;//3200.0;//3200.0;
     mqtt.freq_h = 4.0;
+    mqtt.lost_connection_timer_1 = 0;
     resetLoops(&gen);
 }
 void init_adc(void)
@@ -2923,6 +2932,7 @@ void mqtt_manager(void)
                                {
                                    data_rx_service[0] = 0;
                                    mqtt.state_machine = MQTT_CONNECT_TO_SERVER_OK;
+                                   mqtt.lost_connection_timer_1 = 0;
                                   // mqtt.lost_connection_timer = 0; //NEW_FOR_TEST
                                }
                                else if(init == 3)
@@ -2934,7 +2944,10 @@ void mqtt_manager(void)
                                        mqtt.lost_connection_timer = 0;
                                        if(mqtt.lost_connection_timer_1 > 3)
                                        {
-                                           //esp8266.c_status = ESP8266_CWJAP_TERMINAL_LR;
+                                           esp8266.c_status = ESP8266_CWJAP_TERMINAL_NF;
+                                           esp8266.station[0].status = TCP_CLIENT_IS_DISCONNECTED;//TCP_CLIENT_IS_NOT_CONNECTED;
+                                           atCommand_tx.tx_flag = 1;
+                                           atCommandManager((int) AT_CWQAP(NUM));
                                        }
                                        else
                                        {
@@ -3151,7 +3164,7 @@ void mqtt_manager(void)
                     if(esp8266.status_counter >= STATUS_Q)
                     {
                         esp8266.status_counter = 0;
-                        if(esp8266.station[0].lost_connection > LOST_CONNECTION_TIMEOUT)
+                        if(esp8266.station[0].lost_connection > 10*LOST_CONNECTION_TIMEOUT)
                         {
                             esp8266.station[0].status = TCP_CLIENT_IS_DISCONNECTED;
                             esp8266.c_status = ESP8266_CWJAP_TERMINAL_NF;
@@ -3161,8 +3174,8 @@ void mqtt_manager(void)
                         {
                             ++esp8266.station[0].lost_connection;
                         }
-                       //if((esp8266.station[0].status == TCP_CLIENT_IS_DISCONNECTED) && (esp8266.c_status == ESP8266_CWJAP_TERMINAL_OK))
-                        if((esp8266.station[0].status == TCP_CLIENT_IS_NOT_CONNECTED))// && (esp8266.c_status == ESP8266_CWJAP_TERMINAL_OK))
+                       if(esp8266.station[0].status == TCP_CLIENT_IS_DISCONNECTED)//&& (esp8266.c_status == ESP8266_CWJAP_TERMINAL_OK))
+                      //  if((esp8266.station[0].status == TCP_CLIENT_IS_NOT_CONNECTED))// && (esp8266.c_status == ESP8266_CWJAP_TERMINAL_OK))
                        {
                           atCommand_tx.tx_flag = 1;
                          // atCommandManager((int) AT_CIPCLOSE(NUM)); //FOR THE TEST
@@ -3651,8 +3664,8 @@ void portSeeker(const char * str_src, uint16_t len_1,  ESP8266 * esp)
                         else
                         {
                                                               esp->station[0].lost_connection = 0;
-                                                              esp8266.station[0].status = TCP_CLIENT_IS_DISCONNECTED;
-                                                              esp8266.c_status = ESP8266_CWJAP_TERMINAL_NF;
+                                                            //  esp8266.station[0].status = TCP_CLIENT_IS_DISCONNECTED;
+                                                              //esp8266.c_status = ESP8266_CWJAP_TERMINAL_NF;
                         }
               }
     }
@@ -3767,8 +3780,8 @@ void portSeeker(const char * str_src, uint16_t len_1,  ESP8266 * esp)
                                else
                                {
                                                                      esp->station[0].lost_connection = 0;
-                                                                     esp8266.station[0].status = TCP_CLIENT_IS_DISCONNECTED;
-                                                                     esp8266.c_status = ESP8266_CWJAP_TERMINAL_NF;
+                                                                    // esp8266.station[0].status = TCP_CLIENT_IS_DISCONNECTED;
+                                                                    // esp8266.c_status = ESP8266_CWJAP_TERMINAL_NF;
                                }
                      }
     }
