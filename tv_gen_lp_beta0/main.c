@@ -2746,6 +2746,18 @@ uint16_t connection_manager(void)
                         {
                             if(esp8266.c_status != ESP8266_CWJAP_TERMINAL_OK)
                             {
+                                if((esp8266.c_status == ESP8266_CWJAP_TERMINAL_NF) && (esp8266.station[0].status == TCP_CLIENT_IS_DISCONNECTED) && (cwjap_counter >= 1000))
+                                {
+                                     esp8266.c_status = ESP8266_CWJAP_TERMINAL_OK;
+                                     esp8266.station[0].status = TCP_CLIENT_IS_DISCONNECTED;//TCP_CLIENT_IS_NOT_CONNECTED;
+                                     atCommand_tx.tx_flag = 1;
+                                     atCommandManager((int) AT_CWJAP_TERMINAL(NUM));
+                                     cwjap_counter = 0;
+                                }
+                                else
+                                {
+                                    ++cwjap_counter;
+                                }
                                 mqtt.state_machine = MMQT_READY_TO_STATUS;
                             }
                             if(esp8266.c_status != ESP8266_CWJAP_TERMINAL_DEBUG)
@@ -2944,10 +2956,13 @@ void mqtt_manager(void)
                                        mqtt.lost_connection_timer = 0;
                                        if(mqtt.lost_connection_timer_1 > 3)
                                        {
-                                           esp8266.c_status = ESP8266_CWJAP_TERMINAL_NF;
-                                           esp8266.station[0].status = TCP_CLIENT_IS_DISCONNECTED;//TCP_CLIENT_IS_NOT_CONNECTED;
-                                           atCommand_tx.tx_flag = 1;
-                                           atCommandManager((int) AT_CWQAP(NUM));
+                                          // if((esp8266.c_status == ESP8266_CWJAP_TERMINAL_OK) && (esp8266.station[0].status == TCP_CLIENT_IS_CONNECTED))
+                                          // {
+                                               esp8266.c_status = ESP8266_CWJAP_TERMINAL_NF;
+                                               esp8266.station[0].status = TCP_CLIENT_IS_DISCONNECTED;//TCP_CLIENT_IS_NOT_CONNECTED;
+                                               atCommand_tx.tx_flag = 1;
+                                               atCommandManager((int) AT_CWQAP(NUM));
+                                          // }
                                        }
                                        else
                                        {
