@@ -77,7 +77,7 @@ uint16_t mqtt_shift[16];
 uint16_t mqtt_shift_counter = 0;
 int cpu_temp = 0;//_IQ(0.0);
 uint16_t vres_detector = 0;
-uint16_t idc_rect = 0;
+int16_t idc_rect = 0;//uint16_t idc_rect = 0;
 //uint16_t rect_temp = 0;
 //int bridge_temp = 0;
 //
@@ -199,7 +199,7 @@ const char * str_comma = ",";
 const char * str_close = "}";
 const char * s1_p;
 uint16_t crc = 0;
-char data_tx[64], data_rx[64], data_rx_service[64], data_rx_mqtt[64];//, data_rx_1[64];
+char data_tx[64], data_rx[32], data_rx_service[64], data_rx_mqtt[64];//, data_rx_1[64];
 
 extern Uint16 Cla1funcsLoadStart;
 extern Uint16 Cla1funcsLoadSize;
@@ -3515,7 +3515,11 @@ uint16_t IPD_parser(const char * str , uint16_t kn)
                 esp8266.station[1].lost_connection = 0;
                 esp8266.station[1].channel = (char)(kn + 48);
                 memcpy(&data_rx[0], &esp8266.AT_rx_buff[n + 2], 32);
-                idc_rect = data_rx[5];
+                idc_rect = 170 - (2*data_rx[3]);
+                if(idc_rect < 0)
+                {
+                    idc_rect = 0;
+                }
             }
             else
             {
