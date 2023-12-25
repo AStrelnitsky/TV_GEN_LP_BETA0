@@ -27,8 +27,8 @@ extern Uint16 vhb[16];
 
 extern float i_in_filt;
 extern Uint16 i_in_filt_counter;
-extern int16 sns[16];
-
+extern int16 sns[8];
+extern float32 fTemp_idc;
 __interrupt void Cla1Task1();
 __interrupt void Cla1Task2();
 __interrupt void Cla1Task3();
@@ -94,6 +94,7 @@ interrupt void Cla1Task7(void )//Uint32 Cla1Task8 (void)
         //    sns[15] = AdcResult.ADCRESULT15;
 
             volts[ADC_IHB_LS] = (((0.00083)*(AdcResult.ADCRESULT1)) - 1.7)*16.0;
+            //volts[ADC_IHB_LS] = (((0.00083)*(AdcResult.ADCRESULT1)))*16.0;
             volts[ADC_TINT] = (sns[ADC_TINT]*0.00083)*(-47.017) + 176.88;
             volts[ADC_TEXT] = (AdcResult.ADCRESULT7)*0.00083;
             if(volts[ADC_TEXT] >= 2.58)
@@ -116,9 +117,12 @@ interrupt void Cla1Task7(void )//Uint32 Cla1Task8 (void)
                volts[ADC_PFC_TEMP] = (volts[ADC_PFC_TEMP])*(-119.05) + 357.14;
             }
             volts[ADC_VDC] = (((AdcResult.ADCRESULT8)*0.00083) - 0.01)*(200.0);
-           // volts[ADC_IDC] = (((AdcResult.ADCRESULT9)*0.00083) - 1.7)*(16.0);// volts[ADC_IDC] = (((AdcResult.ADCRESULT9)*0.00083) - 1.7)*16.0;
+          //  volts[ADC_IDC] = ((((AdcResult.ADCRESULT13)*0.00083) - 1.7)*160.0);//volts[ADC_IDC] = (((AdcResult.ADCRESULT9)*0.00083) - 1.7)*(16.0);//volts[ADC_IDC] = (((AdcResult.ADCRESULT9)*0.00083) - 1.7)*(16.0);
             volts[ADC_VRES] = 200.0*((((float)(AdcResult.ADCRESULT6))*0.00083) - 1.70);
-
+         //   vhb[15] = ((AdcResult.ADCRESULT15) >> 2);
+         //   vhb[14] = ((AdcResult.ADCRESULT14) >> 2);
+        //    vhb[13] = ((AdcResult.ADCRESULT13) >> 2);
+        //    vhb[12] = ((AdcResult.ADCRESULT12) >> 2);
 #pragma UNROLL(7)
            for(i=FILTER_LEN-1;i>0;i--)
            {
@@ -131,17 +135,35 @@ interrupt void Cla1Task7(void )//Uint32 Cla1Task8 (void)
            volts[ADC_VDC] = fTemp*1.09;
         i = 0;
         fTemp = 0;
-
+/*
 #pragma UNROLL(7)
+
            for(i=FILTER_LEN-1;i>0;i--)
            {
                fDelayLine[i] = fDelayLine[i-1];
 
                fTemp += fCoeffs[i]*fDelayLine[i];
            }
-           fDelayLine[0] = (((((float)(AdcResult.ADCRESULT9))*0.00083) - 1.68)*(160.0));//volts[ADC_IDC]; //convert to single precision float
+           fDelayLine[0] = (((((float)(AdcResult.ADCRESULT13))*0.00083) - 1.7)*(160.0));//volts[ADC_IDC]; //convert to single precision float
            fTemp += fCoeffs[0]*fDelayLine[0];
            volts[ADC_IDC] = fTemp;
+           */
+           fDelayLine[0] = (((((float)(AdcResult.ADCRESULT13))*0.00083))*(16.0));
+         //  if(fTemp_idc == 0)
+         //  {
+         //     fTemp_idc = fDelayLine[0];
+         //  }
+         //  if(fDelayLine[0] > 0.0)
+         // {
+           fTemp_idc = (fTemp_idc + ((0.00005)*(fDelayLine[0] - fTemp_idc)));
+           if(fTemp_idc > 2.73)
+           {
+               volts[ADC_IDC] = fTemp_idc - 27.4;
+           }
+           else
+           {
+               volts[ADC_IDC] = 0.0;
+           }
         }
         break;
 
@@ -225,5 +247,6 @@ interrupt void Cla1Task8 (void)
   //  fCoeffs_VDC[4] = 0.00625;
 
     isr_counter = 0;
+    fTemp_idc = 0.0;
 
 }

@@ -38,12 +38,13 @@
 #pragma DATA_SECTION (vhb, "Cla1ToCpuMsgRAM");
 #pragma DATA_SECTION (sns, "Cla1ToCpuMsgRAM");
 #pragma DATA_SECTION (ihb_ls, "Cla1ToCpuMsgRAM");
+#pragma DATA_SECTION (fTemp_idc, "Cla1ToCpuMsgRAM");
 //#pragma CODE_SECTION(flash_processing, "ramfuncs");
 #pragma CODE_SECTION(Flash_Erase, "ramfuncs");
 #pragma CODE_SECTION(Flash_Program, "ramfuncs");
 
 #define LOWPASS 1
-#define PERIOD_DIVIDER_TIM 1
+#define PERIOD_DIVIDER_TIM 2
 #define PERIOD_MULTIPLIER_TIM 32
 #define BURST_FREQ 100
 #define PROG_ADDR 0x3EE000
@@ -71,13 +72,14 @@ float i_in_filt;
 Uint16 i_in_filt_counter;
 Uint16 seq_counter;
 Uint16 vhb[16];
-int16 sns[16];
+int16 sns[8];
 int16 ihb_ls[16];
 uint16_t mqtt_shift[16];
 uint16_t mqtt_shift_counter = 0;
 int cpu_temp = 0;//_IQ(0.0);
 uint16_t vres_detector = 0;
 int16_t idc_rect = 0;//uint16_t idc_rect = 0;
+float32 fTemp_idc = 0.0;
 //uint16_t rect_temp = 0;
 //int bridge_temp = 0;
 //
@@ -110,7 +112,7 @@ int16_t idc_rect = 0;//uint16_t idc_rect = 0;
 #define USER_DEBUG 1
 #define WIFI_TIMER_OVERFLOW 10//0x200//0x1FF//0x1FF
 #define WIFI_INIT_TIMER_OVERFLOW 0x250//0x1FF
-#define STATUS_Q_MQTT 100//200//10//20//10//100
+#define STATUS_Q_MQTT 50//100//200//10//20//10//100
 
 //__interrupt void cpu_timer0_isr(void);
 __interrupt void cpu_timer1_isr(void);
@@ -277,8 +279,8 @@ uint16_t id_state = 0;
 uint16_t e_detector = 0;
 uint16_t uh = 18;
 uint16_t ul = 24;
-uint16_t idc = 0;
-uint32_t idc_acc = 0;
+uint16_t idc = 0;//uint16_t idc = 0;
+uint32_t idc_acc = 0;//uint32_t idc_acc = 0;
 uint16_t tim_counter = 0;
 int MEP_ScaleFactor;
 uint16_t publish_counter = 0;
@@ -305,6 +307,8 @@ char cwjap_mem[60];
 uint16_t cwjap_len = 16;
 uint16_t cwjap_counter = 0;
 uint16_t dev_num = 1;
+uint16_t burst_none = 0;
+#define DSP_DEBUG 1;
 //char cwsap_mem[60];
 //uint16_t cwsap_len = 16;
 //
@@ -664,6 +668,7 @@ void init_CPUT_timer(void)
 __interrupt void cpu_timer1_isr(void)
 {
     _iq d_b = _IQ(0.0);
+    float32 i_raw = 0.0;
     if(esp8266.c_status != ESP8266_CWJAP_TERMINAL_LR)
     {
         ServiceDog();
@@ -673,19 +678,23 @@ __interrupt void cpu_timer1_isr(void)
         while(1){};
     }
     vres_detector = data_rx[4] + (((uint16_t)data_rx[5]) << 8);
-    if(tim_counter < 256)
+    i_raw = volts[ADC_IDC];
+    if(burst_none == 1)
     {
-        if(volts[ADC_IDC] > 0.0)
+        if(tim_counter < 1)
         {
-           idc_acc  += (uint16_t)(volts[ADC_IDC]*10.0);
+            if(i_raw > 0.0)
+            {
+               idc_acc  += (uint16_t)(i_raw*100.0);
+            }
+            ++tim_counter;
         }
-        ++tim_counter;
-    }
-    else
-    {
-        idc = idc_acc / tim_counter;
-        tim_counter = 0;
-        idc_acc = 0;
+        else
+        {
+            idc = (idc_acc / tim_counter); //idc = (idc_acc / tim_counter) - 1730;
+            tim_counter = 0;
+            idc_acc = 0;
+        }
     }
    // rect_temp = (uint16_t)data_rx[6];
     if(mqtt.swicth == 1)
@@ -832,12 +841,14 @@ __interrupt void cpu_timer1_isr(void)
             {
                 CpuTimer1.InterruptCount = 0;
                 gen.AMP = 0.95;//0.48;
+                burst_none = 1;
             }
             if(CpuTimer1.InterruptCount < BURST_FREQ)
             {
                 if((CpuTimer1.InterruptCount) >= ((burst_duty)*(BURST_FREQ)))
                 {
                     gen.AMP = 0.0;//apm
+                    burst_none = 0;
                 }
                 else
                 {
@@ -900,6 +911,7 @@ __interrupt void cpu_timer1_isr(void)
            EPwm4Regs.TBPRD = (base / PERIOD_DIVIDER_TIM);
        }
        EPwm4Regs.CMPA.half.CMPA = (EPwm4Regs.TBPRD / 2);
+       EPwm4Regs.CMPB = ((EPwm4Regs.TBPRD / 2) - ((5*base)/6));
 
        EDIS;
   // debug_console();
@@ -1066,6 +1078,9 @@ void InitEPwmTimer4(void)
     EPwm4Regs.ETSEL.bit.SOCAEN = TB_ENABLE;
     EPwm4Regs.ETSEL.bit.SOCASEL = ET_CTR_ZERO;//ET_CTR_PRD;//ET_CTRU_CMPA;
     EPwm4Regs.ETPS.bit.SOCAPRD = ET_2ND;
+    EPwm4Regs.ETSEL.bit.SOCBEN = TB_ENABLE;
+    EPwm4Regs.ETSEL.bit.SOCBSEL = ET_CTR_PRD;
+    EPwm4Regs.ETPS.bit.SOCBPRD = ET_1ST;
     EPwm4Regs.ETSEL.bit.INTSEL = ET_CTR_PRD;//ET_CTRU_CMPA;
     EPwm4Regs.ETSEL.bit.INTEN = 0; // Enable INT
     EPwm4Regs.TBCTR = 0x0000;                    // Clear timer counter
@@ -1362,31 +1377,31 @@ void init_adc(void)
 
     AdcRegs.ADCSOC9CTL.bit.CHSEL    = 9;// ADC_PFC_Temp //2;
     AdcRegs.ADCSOC9CTL.bit.TRIGSEL  = 0x0B; //EPWM4_SOCA
-    AdcRegs.ADCSOC9CTL.bit.ACQPS    = 8;//6;
+    AdcRegs.ADCSOC9CTL.bit.ACQPS    = 23;
 
     AdcRegs.ADCSOC10CTL.bit.CHSEL    = 10; //ADC_PFC_Vin
     AdcRegs.ADCSOC10CTL.bit.TRIGSEL  = 0x0B; //EPWM4_SOCA
     AdcRegs.ADCSOC10CTL.bit.ACQPS    = 8;//6;
 
-    AdcRegs.ADCSOC11CTL.bit.CHSEL    = 11;//ADC_PFC_Iin 2;
+    AdcRegs.ADCSOC11CTL.bit.CHSEL    = 9;//11;//ADC_PFC_Iin 2;
     AdcRegs.ADCSOC11CTL.bit.TRIGSEL  = 0x0B; //EPWM4_SOCA
-    AdcRegs.ADCSOC11CTL.bit.ACQPS    = 8;//6;
+    AdcRegs.ADCSOC11CTL.bit.ACQPS    = 8;
 
-    AdcRegs.ADCSOC12CTL.bit.CHSEL    = 12;// ADC_Version 2;
-    AdcRegs.ADCSOC12CTL.bit.TRIGSEL  = 0x0B; //EPWM4_SOCA
-    AdcRegs.ADCSOC12CTL.bit.ACQPS    = 8;//6;
+    AdcRegs.ADCSOC12CTL.bit.CHSEL    = 9;//12;// ADC_Version 2;
+    AdcRegs.ADCSOC12CTL.bit.TRIGSEL  = 0x0C; //EPWM4_SOCA
+    AdcRegs.ADCSOC12CTL.bit.ACQPS    = 23;
 
-    AdcRegs.ADCSOC13CTL.bit.CHSEL    = 13;
-    AdcRegs.ADCSOC13CTL.bit.TRIGSEL  = 0x0B; //EPWM4_SOCA
-    AdcRegs.ADCSOC13CTL.bit.ACQPS    = 8;//6;
+    AdcRegs.ADCSOC13CTL.bit.CHSEL    = 9;//13;
+    AdcRegs.ADCSOC13CTL.bit.TRIGSEL  = 0x0C; //EPWM4_SOCAs
+    AdcRegs.ADCSOC13CTL.bit.ACQPS    = 23;
 
-    AdcRegs.ADCSOC14CTL.bit.CHSEL    = 14;
-    AdcRegs.ADCSOC14CTL.bit.TRIGSEL  = 0x0B; //EPWM4_SOCA
-    AdcRegs.ADCSOC14CTL.bit.ACQPS    = 8;//6;
+    AdcRegs.ADCSOC14CTL.bit.CHSEL    = 9;//14;
+    AdcRegs.ADCSOC14CTL.bit.TRIGSEL  = 0x0C; //EPWM4_SOCA
+    AdcRegs.ADCSOC14CTL.bit.ACQPS    = 23;
 
-    AdcRegs.ADCSOC15CTL.bit.CHSEL    = 15;
-    AdcRegs.ADCSOC15CTL.bit.TRIGSEL  = 0x0B; //EPWM4_SOCA
-    AdcRegs.ADCSOC15CTL.bit.ACQPS    = 8;//6;
+    AdcRegs.ADCSOC15CTL.bit.CHSEL    = 9;//15;
+    AdcRegs.ADCSOC15CTL.bit.TRIGSEL  = 0x0C; //EPWM4_SOCA
+    AdcRegs.ADCSOC15CTL.bit.ACQPS    = 23;
     EDIS;
 }
 void init_cla(void)
@@ -1461,22 +1476,22 @@ __interrupt void cla1_isr7()
             case 0:
             {
                            EALLOW;
-                           AdcRegs.ADCSOC0CTL.bit.CHSEL     = 6;//2//ADC_Ihb_Is2;
-                           AdcRegs.ADCSOC1CTL.bit.CHSEL     = 6;//2;//ADC_Ihb_Is2;
-                           AdcRegs.ADCSOC2CTL.bit.CHSEL     = 6;//2;// ADC_Vhb
-                           AdcRegs.ADCSOC3CTL.bit.CHSEL     = 6;//2;// Tint
-                           AdcRegs.ADCSOC4CTL.bit.CHSEL     = 6;//2;// ADC_Ihb2;
-                           AdcRegs.ADCSOC5CTL.bit.CHSEL     = 6;//2;// ADC_Vres 2;
-                           AdcRegs.ADCSOC6CTL.bit.CHSEL     = 6;//2;// ADC_Text 2;
-                           AdcRegs.ADCSOC7CTL.bit.CHSEL     = 6;//2;// ADC_Vdc
-                           AdcRegs.ADCSOC8CTL.bit.CHSEL     = 6;//2; //ADC_Idc //2;
-                           AdcRegs.ADCSOC9CTL.bit.CHSEL     = 6;//2;// ADC_PFC_Temp //2;
-                           AdcRegs.ADCSOC10CTL.bit.CHSEL    = 6;//2; //ADC_PFC_Vin
-                           AdcRegs.ADCSOC11CTL.bit.CHSEL    = 6;//2;//ADC_PFC_Iin 2;
-                           AdcRegs.ADCSOC12CTL.bit.CHSEL    = 6;//2;// ADC_Version 2;
-                           AdcRegs.ADCSOC13CTL.bit.CHSEL    = 6;//2;
-                           AdcRegs.ADCSOC14CTL.bit.CHSEL    = 6;//2;
-                           AdcRegs.ADCSOC15CTL.bit.CHSEL    = 6;//2;
+                           AdcRegs.ADCSOC0CTL.bit.CHSEL     = 9;//6;//2//ADC_Ihb_Is2;
+                           AdcRegs.ADCSOC1CTL.bit.CHSEL     = 9;//6;//2;//ADC_Ihb_Is2;
+                           AdcRegs.ADCSOC2CTL.bit.CHSEL     = 9;//6;//2;// ADC_Vhb
+                           AdcRegs.ADCSOC3CTL.bit.CHSEL     = 9;//6;//2;// Tint
+                           AdcRegs.ADCSOC4CTL.bit.CHSEL     = 9;//6;//2;// ADC_Ihb2;
+                           AdcRegs.ADCSOC5CTL.bit.CHSEL     = 9;//6;//2;// ADC_Vres 2;
+                           AdcRegs.ADCSOC6CTL.bit.CHSEL     = 9;//6;//2;// ADC_Text 2;
+                           AdcRegs.ADCSOC7CTL.bit.CHSEL     = 9;//6;//2;// ADC_Vdc
+                           AdcRegs.ADCSOC8CTL.bit.CHSEL     = 9;//6;//2; //ADC_Idc //2;
+                           AdcRegs.ADCSOC9CTL.bit.CHSEL     = 9;//6;//2;// ADC_PFC_Temp //2;
+                           AdcRegs.ADCSOC10CTL.bit.CHSEL    = 9;//6;//2; //ADC_PFC_Vin
+                           AdcRegs.ADCSOC11CTL.bit.CHSEL    = 9;//6;//2;//ADC_PFC_Iin 2;
+                           AdcRegs.ADCSOC12CTL.bit.CHSEL    = 9;//6;//2;// ADC_Version 2;
+                           AdcRegs.ADCSOC13CTL.bit.CHSEL    = 9;//6;//2;
+                           AdcRegs.ADCSOC14CTL.bit.CHSEL    = 9;//6;//2;
+                           AdcRegs.ADCSOC15CTL.bit.CHSEL    = 9;//6;//2;
                            EDIS;
             }
             break;
@@ -1495,10 +1510,10 @@ __interrupt void cla1_isr7()
                            AdcRegs.ADCSOC9CTL.bit.CHSEL     = 9;// ADC_PFC_Temp //2;
                            AdcRegs.ADCSOC10CTL.bit.CHSEL    = 10; //ADC_PFC_Vin
                            AdcRegs.ADCSOC11CTL.bit.CHSEL    = 11;//ADC_PFC_Iin 2;
-                           AdcRegs.ADCSOC12CTL.bit.CHSEL    = 12;// ADC_Version 2;
-                           AdcRegs.ADCSOC13CTL.bit.CHSEL    = 13;
-                           AdcRegs.ADCSOC14CTL.bit.CHSEL    = 14;
-                           AdcRegs.ADCSOC15CTL.bit.CHSEL    = 15;
+                           AdcRegs.ADCSOC12CTL.bit.CHSEL    = 9;// ADC_Version 2;
+                           AdcRegs.ADCSOC13CTL.bit.CHSEL    = 9;
+                           AdcRegs.ADCSOC14CTL.bit.CHSEL    = 9;
+                           AdcRegs.ADCSOC15CTL.bit.CHSEL    = 9;
                            EDIS;
             }
             break;
@@ -2642,10 +2657,10 @@ uint16_t connection_manager(void)
                     remote_data[23] = 0;
                     remote_data[24] = 0;
                     remote_data[25] = 0;
-                    remote_data[26]  = 0;
-                    remote_data[27]  = 0;
-                    remote_data[28]  = 0;
-                    remote_data[29]  = 0;
+                    remote_data[26]  = 0;//vhb[12];
+                    remote_data[27]  = 0;//vhb[13];
+                    remote_data[28]  = 0;//vhb[14];
+                    remote_data[29]  = 0;//svhb[15];
 
                     remote_data[30] = 0;//(uint16_t)(burst_duty*100.0);
                     remote_data[31] = 0;
@@ -3515,7 +3530,7 @@ uint16_t IPD_parser(const char * str , uint16_t kn)
                 esp8266.station[1].lost_connection = 0;
                 esp8266.station[1].channel = (char)(kn + 48);
                 memcpy(&data_rx[0], &esp8266.AT_rx_buff[n + 2], 32);
-                idc_rect = 170 - (2*data_rx[3]);
+                idc_rect = 155 - (16*((((uint16_t)data_rx[3]) << 8) + data_rx[2]))/100;//(((uint16_t)data_rx[3]) << 8) + data_rx[2];//970 - (64*((((uint16_t)data_rx[3]) << 8) + data_rx[2]))/100;//2*(255 - data_rx[3]);//170 - (2*data_rx[3]);
                 if(idc_rect < 0)
                 {
                     idc_rect = 0;

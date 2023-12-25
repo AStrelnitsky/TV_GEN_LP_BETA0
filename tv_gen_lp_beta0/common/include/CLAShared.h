@@ -70,7 +70,8 @@ extern "C" {
     extern Uint16 i_in_filt_counter;
     extern Uint16 seq_counter;
     extern Uint16 vhb[16];
-    extern int16 sns[16];
+    extern int16 sns[8];
+    extern float32 fTemp_idc;
     //
     // The following are symbols defined in the CLA assembly code
     // Including them in the shared header file makes them
