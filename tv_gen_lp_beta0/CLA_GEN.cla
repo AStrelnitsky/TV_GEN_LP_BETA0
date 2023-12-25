@@ -148,7 +148,7 @@ interrupt void Cla1Task7(void )//Uint32 Cla1Task8 (void)
            fTemp += fCoeffs[0]*fDelayLine[0];
            volts[ADC_IDC] = fTemp;
            */
-           fDelayLine[0] = (((((float)(AdcResult.ADCRESULT13))*0.00083))*(16.0));
+           fDelayLine[0] = (((((float)(AdcResult.ADCRESULT9))*0.00083))*(16.0));
          //  if(fTemp_idc == 0)
          //  {
          //     fTemp_idc = fDelayLine[0];

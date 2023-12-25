@@ -1376,7 +1376,7 @@ void init_adc(void)
     AdcRegs.ADCSOC8CTL.bit.ACQPS    = 8;//6;
 
     AdcRegs.ADCSOC9CTL.bit.CHSEL    = 9;// ADC_PFC_Temp //2;
-    AdcRegs.ADCSOC9CTL.bit.TRIGSEL  = 0x0B; //EPWM4_SOCA
+    AdcRegs.ADCSOC9CTL.bit.TRIGSEL  = 0x0C; //EPWM4_SOCA
     AdcRegs.ADCSOC9CTL.bit.ACQPS    = 23;
 
     AdcRegs.ADCSOC10CTL.bit.CHSEL    = 10; //ADC_PFC_Vin
