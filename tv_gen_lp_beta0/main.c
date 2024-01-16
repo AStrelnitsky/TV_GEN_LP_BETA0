@@ -292,7 +292,7 @@ uint16_t trx = 85;
 float ttx = 100.0;
 float dD = 12000.0;
 uint16_t OV_counter = 0;
-float burst_l = 0.050;//0.039;
+float burst_l = 0.070;//0.039;
 uint16_t flash_tx = 0;
 HEADER BlockHeader;
 Uint16 progBuf[64] = {1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,17,16,19,20,21,22,23,24,25,26,27,28,29,30,31,32,33,34,35,36,37,38,39,40,41,42,43,44,45,46,47,48,49,50,51,52,53,54,55,56,57,58,59,60,61,62,63,64};
@@ -395,7 +395,7 @@ int main(void)
         EINT;   // Enable Global interrupt INTM
         ERTM;
 
-       initWiFi_station();
+        initWiFi_station();
 
         gen_initial_conditions();
 
@@ -409,7 +409,7 @@ int main(void)
         InitEPwmTimer2();
         InitEPwmTimer3();
         InitEPwmTimer4();
-        //InitEPwmTimer5();
+        InitEPwmTimer5();
 
         init_CPUT_timer();
 
@@ -685,15 +685,26 @@ __interrupt void cpu_timer1_isr(void)
         {
             if(i_raw > 0.0)
             {
-               idc_acc  += (uint16_t)(i_raw*100.0);
+               idc_acc  += (uint16_t)(i_raw*10.0);
             }
             ++tim_counter;
         }
         else
         {
-            idc = (idc_acc / tim_counter); //idc = (idc_acc / tim_counter) - 1730;
-            tim_counter = 0;
-            idc_acc = 0;
+            if(burst_duty <= burst_l)
+            {
+                idc = 0;
+            }
+            else
+            {
+                idc = 100*((idc_acc / tim_counter) - 260); //idc = (idc_acc / tim_counter) - 1730;
+                if (idc < 0)
+                {
+                    idc = 0;
+                }
+                tim_counter = 0;
+                idc_acc = 0;
+            }
         }
     }
    // rect_temp = (uint16_t)data_rx[6];
@@ -933,7 +944,7 @@ void InitEPwmTimer1(void)
     //
     // Disable Sync
     //
-    EPwm1Regs.TBCTL.bit.SYNCOSEL = 11;//10;  // Pass through
+    EPwm1Regs.TBCTL.bit.SYNCOSEL = 0x01;//11;//10;  // Pass through
     //
     // Initially disable Free/Soft Bits
     //
@@ -996,8 +1007,8 @@ void InitEPwmTimer2(void)
     //
     // Disable Sync
     //
-    EPwm2Regs.TBCTL.bit.SYNCOSEL = 11;  // Pass through
-    //
+    EPwm2Regs.TBCTL.bit.SYNCOSEL = 0;//11;  // Pass through
+    //sssssss
     // Initially disable Free/Soft Bits
     //
     EPwm2Regs.TBCTL.bit.FREE_SOFT = 0;
@@ -1031,7 +1042,7 @@ void InitEPwmTimer3(void)
     //
     // Disable Sync
     //
-    EPwm3Regs.TBCTL.bit.SYNCOSEL = 11;  // Pass through
+    EPwm3Regs.TBCTL.bit.SYNCOSEL = 0;//11;  // Pass through
     //
     // Initially disable Free/Soft Bits
     //
@@ -1063,7 +1074,7 @@ void InitEPwmTimer4(void)
     //
     // Disable Sync
     //
-    EPwm4Regs.TBCTL.bit.SYNCOSEL = 11;  // Pass through
+    EPwm4Regs.TBCTL.bit.SYNCOSEL = 0;//11;  // Pass through
     //
     // Initially disable Free/Soft Bits
     //
@@ -1103,7 +1114,7 @@ void InitEPwmTimer5(void)
     //
     // Disable Sync
     //
-    EPwm5Regs.TBCTL.bit.SYNCOSEL = 11;  // Pass through
+    EPwm5Regs.TBCTL.bit.SYNCOSEL = 0;  // Pass through
     //
     // Initially disable Free/Soft Bits
     //
@@ -1116,8 +1127,8 @@ void InitEPwmTimer5(void)
     EPwm5Regs.TBCTL.bit.PHSEN = TB_ENABLE;
 
     EPwm5Regs.ETSEL.bit.SOCAEN = TB_ENABLE;
-    EPwm5Regs.ETSEL.bit.SOCASEL = ET_CTR_ZERO;//ET_CTR_PRD;//ET_CTRU_CMPA;
-    EPwm5Regs.ETPS.bit.SOCAPRD = ET_2ND;
+    EPwm5Regs.ETSEL.bit.SOCASEL =ET_CTRU_CMPA;
+    EPwm5Regs.ETPS.bit.SOCAPRD = ET_1ST;//ET_2ND;
     EPwm5Regs.ETSEL.bit.INTSEL = ET_CTR_PRD;//ET_CTRU_CMPA;
     EPwm5Regs.ETSEL.bit.INTEN = 0; // Enable INT
     EPwm5Regs.TBCTR = 0x0000;                    // Clear timer counter
@@ -1290,8 +1301,8 @@ void gen_initial_conditions(void)
     amp_fix = 1.0;
     mqtt.kp_u = 0.95;
     mqtt.ki_u = 0.1;
-    mqtt.dD = 12;
-    mqtt.k3 = 0.050;//0.039;
+    mqtt.dD = 10;
+    mqtt.k3 = 0.070;//0.039;
     mqtt.af = 1.0;
     mqtt.freq = 3200.0;//5000.0;//3200.0;//3200.0;
     mqtt.freq_h = 4.0;
@@ -1340,7 +1351,7 @@ void init_adc(void)
     // set SOC1 S/H Window to 7 ADC Clock Cycles, (6 ACQPS plus 1)
     //
     AdcRegs.ADCSOC0CTL.bit.CHSEL    = 5;// Internal Temp Sensor 0//ADC_Ihb_Is2;
-    AdcRegs.ADCSOC0CTL.bit.TRIGSEL  = 0x0B; //EPWM4_SOCA
+    AdcRegs.ADCSOC0CTL.bit.TRIGSEL  = 0x0D;//; //EPWM4_SOCA
     AdcRegs.ADCSOC0CTL.bit.ACQPS    = 8;
 
     AdcRegs.ADCSOC1CTL.bit.CHSEL    = 1;//ADC_Ihb_Is2;
@@ -1348,60 +1359,60 @@ void init_adc(void)
     AdcRegs.ADCSOC1CTL.bit.ACQPS    = 8;//6;
 
     AdcRegs.ADCSOC2CTL.bit.CHSEL    = 2;// ADC_Vhb
-    AdcRegs.ADCSOC2CTL.bit.TRIGSEL  = 0x0B; //EPWM4_SOCA
+    AdcRegs.ADCSOC2CTL.bit.TRIGSEL  = 0x0D;//; //EPWM4_SOCA
     AdcRegs.ADCSOC2CTL.bit.ACQPS    = 8;//6;
 
     AdcRegs.ADCSOC3CTL.bit.CHSEL    = 3;// Tint
-    AdcRegs.ADCSOC3CTL.bit.TRIGSEL  = 0x0B; //EPWM4_SOCA
+    AdcRegs.ADCSOC3CTL.bit.TRIGSEL  = 0x0D;//; //EPWM4_SOCA
     AdcRegs.ADCSOC3CTL.bit.ACQPS    = 8;//6;
 
     AdcRegs.ADCSOC4CTL.bit.CHSEL    = 4;// ADC_Ihb2;
-    AdcRegs.ADCSOC4CTL.bit.TRIGSEL  = 0x0B; //EPWM4_SOCA
+    AdcRegs.ADCSOC4CTL.bit.TRIGSEL  = 0x0D;//; //EPWM4_SOCA
     AdcRegs.ADCSOC4CTL.bit.ACQPS    = 8;//6;
 
     AdcRegs.ADCSOC5CTL.bit.CHSEL    = 5;// ADC_Vres 2;
-    AdcRegs.ADCSOC5CTL.bit.TRIGSEL  = 0x0B; //EPWM4_SOCA
+    AdcRegs.ADCSOC5CTL.bit.TRIGSEL  = 0x0D;//0x0B; //EPWM4_SOCA
     AdcRegs.ADCSOC5CTL.bit.ACQPS    = 8;//6;
 
     AdcRegs.ADCSOC6CTL.bit.CHSEL    = 6;// ADC_Text 2;
-    AdcRegs.ADCSOC6CTL.bit.TRIGSEL  = 0x0B; //EPWM4_SOCA
+    AdcRegs.ADCSOC6CTL.bit.TRIGSEL  = 0x0D;//0x0B; //EPWM4_SOCA
     AdcRegs.ADCSOC6CTL.bit.ACQPS    = 8;//6;
 
     AdcRegs.ADCSOC7CTL.bit.CHSEL    = 7;// ADC_Vdc
-    AdcRegs.ADCSOC7CTL.bit.TRIGSEL  = 0x0B; //EPWM4_SOCA
+    AdcRegs.ADCSOC7CTL.bit.TRIGSEL  = 0x0D;//0x0B; //EPWM4_SOCA
     AdcRegs.ADCSOC7CTL.bit.ACQPS    = 8;//6;
 
     AdcRegs.ADCSOC8CTL.bit.CHSEL    = 8; //ADC_Idc //2;
-    AdcRegs.ADCSOC8CTL.bit.TRIGSEL  = 0x0B; //EPWM4_SOCA
+    AdcRegs.ADCSOC8CTL.bit.TRIGSEL  = 0x0D;//0x0B; //EPWM4_SOCA
     AdcRegs.ADCSOC8CTL.bit.ACQPS    = 8;//6;
 
     AdcRegs.ADCSOC9CTL.bit.CHSEL    = 9;// ADC_PFC_Temp //2;
-    AdcRegs.ADCSOC9CTL.bit.TRIGSEL  = 0x0C; //EPWM4_SOCA
-    AdcRegs.ADCSOC9CTL.bit.ACQPS    = 23;
+    AdcRegs.ADCSOC9CTL.bit.TRIGSEL  = 0x0D;//0x0B; //EPWM4_SOCA
+    AdcRegs.ADCSOC9CTL.bit.ACQPS    = 8;
 
     AdcRegs.ADCSOC10CTL.bit.CHSEL    = 10; //ADC_PFC_Vin
-    AdcRegs.ADCSOC10CTL.bit.TRIGSEL  = 0x0B; //EPWM4_SOCA
+    AdcRegs.ADCSOC10CTL.bit.TRIGSEL  = 0x0D;//0x0B; //EPWM4_SOCA
     AdcRegs.ADCSOC10CTL.bit.ACQPS    = 8;//6;
 
     AdcRegs.ADCSOC11CTL.bit.CHSEL    = 9;//11;//ADC_PFC_Iin 2;
-    AdcRegs.ADCSOC11CTL.bit.TRIGSEL  = 0x0B; //EPWM4_SOCA
+    AdcRegs.ADCSOC11CTL.bit.TRIGSEL  = 0x0D;//0x0B; //EPWM4_SOCA
     AdcRegs.ADCSOC11CTL.bit.ACQPS    = 8;
 
     AdcRegs.ADCSOC12CTL.bit.CHSEL    = 9;//12;// ADC_Version 2;
-    AdcRegs.ADCSOC12CTL.bit.TRIGSEL  = 0x0C; //EPWM4_SOCA
-    AdcRegs.ADCSOC12CTL.bit.ACQPS    = 23;
+    AdcRegs.ADCSOC12CTL.bit.TRIGSEL  = 0x0D;//0x0C; //EPWM4_SOCA
+    AdcRegs.ADCSOC12CTL.bit.ACQPS    = 8;
 
     AdcRegs.ADCSOC13CTL.bit.CHSEL    = 9;//13;
-    AdcRegs.ADCSOC13CTL.bit.TRIGSEL  = 0x0C; //EPWM4_SOCAs
-    AdcRegs.ADCSOC13CTL.bit.ACQPS    = 23;
+    AdcRegs.ADCSOC13CTL.bit.TRIGSEL  = 0x0D;//0x0C; //EPWM4_SOCAs
+    AdcRegs.ADCSOC13CTL.bit.ACQPS    = 8;
 
     AdcRegs.ADCSOC14CTL.bit.CHSEL    = 9;//14;
-    AdcRegs.ADCSOC14CTL.bit.TRIGSEL  = 0x0C; //EPWM4_SOCA
-    AdcRegs.ADCSOC14CTL.bit.ACQPS    = 23;
+    AdcRegs.ADCSOC14CTL.bit.TRIGSEL  = 0x0D;//0x0C; //EPWM4_SOCA
+    AdcRegs.ADCSOC14CTL.bit.ACQPS    = 8;
 
     AdcRegs.ADCSOC15CTL.bit.CHSEL    = 9;//15;
-    AdcRegs.ADCSOC15CTL.bit.TRIGSEL  = 0x0C; //EPWM4_SOCA
-    AdcRegs.ADCSOC15CTL.bit.ACQPS    = 23;
+    AdcRegs.ADCSOC15CTL.bit.TRIGSEL  = 0x0D;//0x0C; //EPWM4_SOCA
+    AdcRegs.ADCSOC15CTL.bit.ACQPS    = 8;
     EDIS;
 }
 void init_cla(void)

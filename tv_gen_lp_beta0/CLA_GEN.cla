@@ -155,15 +155,15 @@ interrupt void Cla1Task7(void )//Uint32 Cla1Task8 (void)
          //  }
          //  if(fDelayLine[0] > 0.0)
          // {
-           fTemp_idc = (fTemp_idc + ((0.00005)*(fDelayLine[0] - fTemp_idc)));
-           if(fTemp_idc > 2.73)
-           {
-               volts[ADC_IDC] = fTemp_idc - 27.4;
-           }
-           else
-           {
-               volts[ADC_IDC] = 0.0;
-           }
+           fTemp_idc = (fTemp_idc + ((0.005)*(fDelayLine[0] - fTemp_idc)));
+           //if(fTemp_idc > 2.73)
+          // {
+               volts[ADC_IDC] = fTemp_idc;//- 27.4;
+          // }
+          // else
+          // {
+          //     volts[ADC_IDC] = 0.0;
+          // }
         }
         break;
 
